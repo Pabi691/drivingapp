@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../auth/auth_service.dart';
+import '../auth/auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,7 +18,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    /// ✅ ONLY 2 tabs are active
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -29,11 +30,8 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-    final pin = authService.userPin ?? 'N/A';
-
     return Scaffold(
-      appBar: _buildAppBar(pin),
+      appBar: _buildAppBar(),
       body: Column(
         children: [
           _buildTabBar(),
@@ -43,8 +41,6 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 _buildToolsTab(context),
                 const Center(child: Text('Settings Content')),
-                const Center(child: Text('Resources Content')),
-                const Center(child: Text('Membership Content')),
               ],
             ),
           ),
@@ -53,12 +49,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  AppBar _buildAppBar(String pin) {
+  // ================= APP BAR =================
+
+  AppBar _buildAppBar() {
     return AppBar(
       automaticallyImplyLeading: false,
-      title: Text(
-        'My PIN $pin',
-        style: const TextStyle(
+      title: const Text(
+        'Settings',
+        style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
@@ -81,6 +79,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ================= TAB BAR =================
+
   Widget _buildTabBar() {
     return Material(
       color: Colors.blue[800],
@@ -92,12 +92,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         tabs: const [
           Tab(text: 'Tools'),
           Tab(text: 'Settings'),
-          // Tab(text: 'Resources'),
-          // Tab(text: 'Membership'),
         ],
       ),
     );
   }
+
+  // ================= TOOLS TAB =================
 
   Widget _buildToolsTab(BuildContext context) {
     return SingleChildScrollView(
@@ -107,6 +107,14 @@ class _SettingsScreenState extends State<SettingsScreen>
         children: [
           Row(
             children: [
+              Expanded(
+                child: _buildMetricCard(
+                  'My Profile', 
+                  Icons.person, 
+                  onTap: () => context.go('/profile'),
+                  ),
+              ),
+              const SizedBox(width: 16),
               Expanded(
                 child: _buildMetricCard('School Metrics', Icons.bar_chart),
               ),
@@ -125,7 +133,6 @@ class _SettingsScreenState extends State<SettingsScreen>
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          // _buildDoodlePadCard(),
           const SizedBox(height: 24),
           _buildSettingsList(context),
         ],
@@ -133,48 +140,28 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildMetricCard(String title, IconData icon) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, size: 40, color: Colors.blue),
-            const SizedBox(height: 8),
-            Text(title, textAlign: TextAlign.center),
-          ],
+  Widget _buildMetricCard(String title, IconData icon, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Icon(icon, size: 40, color: Colors.blue),
+              const SizedBox(height: 8),
+              Text(title, textAlign: TextAlign.center),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDoodlePadCard() {
-    return Card(
-      color: Colors.blue[900],
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 32),
-        child: Column(
-          children: [
-            Text(
-              'Doodle Pad',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text('Draw on Maps', style: TextStyle(color: Colors.white70)),
-          ],
-        ),
-      ),
-    );
-  }
+  // ================= SETTINGS LIST =================
 
   Widget _buildSettingsList(BuildContext context) {
     return Column(
@@ -184,10 +171,14 @@ class _SettingsScreenState extends State<SettingsScreen>
           Icons.arrow_forward_ios,
           () {},
         ),
-        _buildSettingsItem('Help', Icons.arrow_forward_ios, () {}),
+        _buildSettingsItem(
+          'Help',
+          Icons.arrow_forward_ios,
+          () {},
+        ),
         _buildSettingsItem(
           'Logout',
-          Icons.arrow_forward_ios,
+          Icons.logout,
           () => _showLogoutDialog(context),
         ),
       ],
@@ -206,8 +197,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ================= LOGOUT =================
+
   void _showLogoutDialog(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authProvider = context.read<AuthProvider>();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -217,14 +211,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           actions: <Widget>[
             TextButton(
               child: const Text('No'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
               child: const Text('Yes'),
               onPressed: () {
-                authService.logout();
+                authProvider.logout();
+                Navigator.of(context).pop();
                 context.go('/');
               },
             ),

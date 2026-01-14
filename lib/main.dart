@@ -1,13 +1,13 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'instructor_app/auth/auth_service.dart';
+import 'instructor_app/auth/auth_provider.dart';
 import 'instructor_app/auth/login_screen.dart';
 import 'instructor_app/auth/welcome_screen.dart';
 import 'instructor_app/auth/get_started_screen.dart';
 import 'instructor_app/screens/dashboard_screen.dart';
+import 'instructor_app/screens/profile_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,24 +19,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => AuthService(),
-      child: Consumer<AuthService>(
-        builder: (context, authService, child) {
+      create: (_) => AuthProvider(),
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
           return MaterialApp.router(
             title: 'Driving School App',
             theme: ThemeData(
               primarySwatch: Colors.blue,
-              visualDensity: VisualDensity.adaptivePlatformDensity,
             ),
-            routerConfig: _buildRouter(authService),
+            routerConfig: _router(authProvider),
           );
         },
       ),
     );
   }
 
-  GoRouter _buildRouter(AuthService authService) {
+  GoRouter _router(AuthProvider authProvider) {
     return GoRouter(
+      refreshListenable: authProvider,
       initialLocation: '/',
       routes: [
         GoRoute(
@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => const LoginScreen(),
+          builder: (context, state) => LoginScreen(),
         ),
         GoRoute(
           path: '/get-started',
@@ -55,20 +55,28 @@ class MyApp extends StatelessWidget {
           path: '/dashboard',
           builder: (context, state) => const DashboardScreen(),
         ),
+       GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileScreen(),
+        ),
       ],
+
+      /// 🔐 AUTH GUARD
       redirect: (context, state) {
-        final isAuthenticated = authService.isAuthenticated;
-        final isLoggingIn = state.matchedLocation == '/' || state.matchedLocation == '/login' || state.matchedLocation == '/get-started';
+        final loggedIn = authProvider.isAuthenticated;
+        final loggingIn = state.matchedLocation == '/' ||
+            state.matchedLocation == '/login' ||
+            state.matchedLocation == '/get-started';
 
-        if (!isAuthenticated && !isLoggingIn) {
-          return '/'; // Redirect to welcome screen if not authenticated
+        if (!loggedIn && !loggingIn) {
+          return '/';
         }
 
-        if (isAuthenticated && isLoggingIn) {
-          return '/dashboard'; // Redirect to dashboard if authenticated and on a login screen
+        if (loggedIn && loggingIn) {
+          return '/dashboard';
         }
 
-        return null; // No redirect needed
+        return null;
       },
     );
   }

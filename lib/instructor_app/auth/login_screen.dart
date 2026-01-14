@@ -1,8 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'auth_service.dart';
+
+import 'auth_provider.dart'; 
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +16,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscureText = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,23 +54,15 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 32),
             _buildTextField(_usernameController, 'Username'),
             const SizedBox(height: 16),
-            _buildTextField(_passwordController, 'Password', obscureText: _obscureText, suffixIcon: _buildPasswordIcon()),
+            _buildTextField(
+              _passwordController,
+              'Password',
+              obscureText: _obscureText,
+              suffixIcon: _buildPasswordIcon(),
+            ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () async {
-                final authService = Provider.of<AuthService>(context, listen: false);
-                final success = await authService.login(
-                  _usernameController.text,
-                  _passwordController.text,
-                );
-                if (success) {
-                  context.go('/get-started');
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invalid username or password')),
-                  );
-                }
-              },
+              onPressed: _isLoading ? null : _login,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.blue,
@@ -70,7 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('Login', style: TextStyle(fontSize: 18)),
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('Login', style: TextStyle(fontSize: 18)),
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -86,7 +89,34 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool obscureText = false, Widget? suffixIcon}) {
+  Future<void> _login() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await context.read<AuthProvider>().login(
+        _usernameController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      context.go('/get-started');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -112,9 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
         color: Colors.white70,
       ),
       onPressed: () {
-        setState(() {
-          _obscureText = !_obscureText;
-        });
+        setState(() => _obscureText = !_obscureText);
       },
     );
   }

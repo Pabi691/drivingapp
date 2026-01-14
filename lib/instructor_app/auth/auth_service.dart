@@ -1,29 +1,35 @@
+import 'dart:convert';
+import '../services/api_client.dart';
+import '../utils/token_storage.dart';
 
-import 'package:flutter/material.dart';
+class AuthService {
+  static Future<void> login(String email, String password) async {
+    final response = await ApiClient.post(
+      '/instructor-login',
+      {
+        'email': email,
+        'password': password,
+      },
+    );
 
-class AuthService with ChangeNotifier {
-  bool _isAuthenticated = false;
-  String? _userPin;
+    final data = jsonDecode(response.body);
 
-  static const String correctPin = '1097';
+    print(data);
 
-  bool get isAuthenticated => _isAuthenticated;
-  String? get userPin => _userPin;
+    if (response.statusCode == 200 && data['success'] == true) {
+      await TokenStorage.saveToken(data['access_token']);
 
-  Future<bool> login(String username, String password) async {
-    // Dummy authentication
-    if (username == 'driving123' && password == '1234') {
-      _isAuthenticated = true;
-      _userPin = correctPin;
-      notifyListeners();
-      return true;
+      // save instructor data
+      await TokenStorage.saveInstructor(jsonEncode(data['instructor_data']));
+
+      // Optionally save user data if needed
+      await TokenStorage.saveUser(jsonEncode(data['user']));
+    } else {
+      throw Exception(data['message'] ?? 'Login failed');
     }
-    return false;
   }
 
-  void logout() {
-    _isAuthenticated = false;
-    _userPin = null;
-    notifyListeners();
+  static Future<void> logout() async {
+    await TokenStorage.clearAll();
   }
 }

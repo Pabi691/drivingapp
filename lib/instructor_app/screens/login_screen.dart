@@ -1,8 +1,26 @@
-
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../auth/auth_service.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,18 +29,12 @@ class LoginScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
+          children: [
             const Text(
               'Login',
               style: TextStyle(
@@ -32,72 +44,72 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            TextFormField(
-              decoration: InputDecoration(
-                labelText: 'Username',
-                labelStyle: const TextStyle(color: Colors.white),
-                filled: true,
-                fillColor: Colors.blue.shade700,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+
+            TextField(
+              controller: _emailController,
               style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Email'),
             ),
+
             const SizedBox(height: 20),
-            TextFormField(
+
+            TextField(
+              controller: _passwordController,
               obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                labelStyle: const TextStyle(color: Colors.white),
-                filled: true,
-                fillColor: Colors.blue.shade700,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                suffixIcon: const Icon(
-                  Icons.visibility_off,
-                  color: Colors.white,
-                ),
-              ),
               style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Password'),
             ),
+
             const SizedBox(height: 40),
+
             ElevatedButton(
-              onPressed: () {
-                // Handle login logic
-              },
+              onPressed: _isLoading ? null : _login,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
               ),
-              child: const Center(
-                child: Text(
-                  'Login',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'Forgot your password?',
-                  style: TextStyle(color: Colors.white),
-                ),
+              child: Center(
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        'Login',
+                        style: TextStyle(color: Colors.blue, fontSize: 18),
+                      ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _login() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await AuthService.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      context.go('/dashboard');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white),
+      filled: true,
+      fillColor: Colors.blue.shade700,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
     );
   }
