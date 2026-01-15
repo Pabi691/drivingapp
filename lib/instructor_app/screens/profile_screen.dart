@@ -15,7 +15,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _initialized = false;
   Map profile = {};
   List workingDays = [];
-  List workingHours = [];
 
   // ✅ ADD THIS METHOD HERE (INSIDE CLASS)
   String dayName(int day) {
@@ -44,137 +43,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
 
-  Future<void> _editWorkingHour(int dayOfWeek, Map hour) async {
-    final instructorId = context.read<AuthProvider>().instructorId;
+  Future<void> _editWorkingHour(int index) async {
+    final day = workingDays[index];
 
-    final startCtrl = TextEditingController(text: hour['start_time']);
-    final endCtrl = TextEditingController(text: hour['end_time']);
+    final startCtrl = TextEditingController(text: day['start_time']);
+    final endCtrl = TextEditingController(text: day['end_time']);
     final breakStartCtrl =
-        TextEditingController(text: hour['break_start']);
+        TextEditingController(text: day['break_start']);
     final breakEndCtrl =
-        TextEditingController(text: hour['break_end']);
+        TextEditingController(text: day['break_end']);
 
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${dayName(dayOfWeek)} Time'),
+        title: Text('${dayName(day['day_of_week'])}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _timeField('Start Time', startCtrl),
-            _timeField('End Time', endCtrl),
+            _timeField('Start', startCtrl),
+            _timeField('End', endCtrl),
             _timeField('Break Start', breakStartCtrl),
             _timeField('Break End', breakEndCtrl),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ProfileService.createWorkingHour({
-                "instructor_id": instructorId,
-                "day_of_week": dayOfWeek,
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              workingDays[index] = {
+                ...day,
                 "start_time": startCtrl.text,
                 "end_time": endCtrl.text,
                 "break_start": breakStartCtrl.text,
                 "break_end": breakEndCtrl.text,
-              });
+              };
+            });
 
-              setState(() {
-                final index = workingHours.indexWhere(
-                    (h) => h['day_of_week'] == dayOfWeek);
-                if (index != -1) {
-                  workingHours[index] = {
-                    ...workingHours[index],
-                    "start_time": startCtrl.text,
-                    "end_time": endCtrl.text,
-                    "break_start": breakStartCtrl.text,
-                    "break_end": breakEndCtrl.text,
-                  };
-                }
-              });
-
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
+            Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
       ),
     );
   }
 
-  Future<void> _updateWorkingDay(int dayOfWeek, bool isWorking) async {
-  final instructorId = context.read<AuthProvider>().instructorId;
-
-  await ProfileService.createWorkingDay({
-    "instructor_id": instructorId,
-    "day_of_week": dayOfWeek,
-    "is_working": isWorking ? 1 : 0,
-  });
-
-  setState(() {
-    final index =
-        workingDays.indexWhere((d) => d['day_of_week'] == dayOfWeek);
-    if (index != -1) {
-      workingDays[index]['is_working'] = isWorking ? 1 : 0;
-    }
-  });
-}
-
   Future<void> _loadData(String instructorId) async {
     final p = await ProfileService.getProfile(instructorId);
     final days = await ProfileService.getWorkingDays(instructorId);
-    final hours = await ProfileService.getWorkingHours(instructorId);
 
-    print('Instructor Profile: ${p}');
-    print('Working Days: ${days}');
-    print('Working Hours: ${hours}');
-    // Auto create if empty
-    if (days.isEmpty) {
-      for (int i = 1; i <= 7; i++) {
-        await ProfileService.createWorkingDay({
-          "instructor_id": instructorId,
-          "day_of_week": i,
-          "is_working": i <= 5 ? 1 : 0, // Mon–Fri ON
-        });
-
-        await ProfileService.createWorkingHour({
-          "instructor_id": instructorId,
-          "day_of_week": i,
-          "start_time": "09:00",
-          "end_time": "18:00",
-          "break_start": "13:00",
-          "break_end": "14:00",
-        });
-      }
-    }
-
-    if (hours.isEmpty) {
-      await ProfileService.createWorkingHour({
-        "instructor_id": instructorId,
-        "day_of_week": 1,
-        "start_time": "09:00",
-        "end_time": "18:00",
-        "break_start": "13:00",
-        "break_end": "14:00"
-      });
-    }
-
-    /// 🔥 RE-FETCH
-    final newDays = await ProfileService.getWorkingDays(instructorId);
-    final newHours = await ProfileService.getWorkingHours(instructorId);
+    // 🔥 First-time instructor → backend already auto-creates 7 days
+    // If not, backend should handle this (BEST PRACTICE)
 
     if (!mounted) return;
 
     setState(() {
       profile = p['data'];
       workingDays = days;
-      workingHours = hours;
       loading = false;
     });
+  }
+
+  Future<void> _saveWorkingSchedule() async {
+    final instructorId = context.read<AuthProvider>().instructorId;
+
+    final Map<String, dynamic> payload = {
+      "instructor_id": instructorId,
+      "workingDays": {}
+    };
+
+    for (final day in workingDays) {
+      final isEnabled = day['is_working'] == 1;
+
+      payload["workingDays"][day['day_of_week'].toString()] = {
+        "enabled": isEnabled,
+
+        if (isEnabled) ...{
+          "workStart": day['start_time'],
+          "workEnd": day['end_time'],
+          "breakStart": day['break_start'],
+          "breakEnd": day['break_end'],
+        }
+      };
+    }
+
+    await ProfileService.upsertWorkingDays(payload);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Schedule saved')),
+    );
   }
 
   @override
@@ -209,72 +170,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _sectionTitle('Working Schedule'),
 
           ...workingDays.map((day) {
-          final int dayOfWeek = day['day_of_week'];
-          final bool isWorking = day['is_working'] == 1;
+            final index = workingDays.indexOf(day);
+            final isWorking = day['is_working'] == 1;
 
-          Map? hour;
-          try {
-            hour = workingHours.firstWhere(
-              (h) => h['day_of_week'] == dayOfWeek,
-            );
-          } catch (_) {
-            hour = null;
-          }
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          dayName(day['day_of_week']),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Switch(
+                          value: isWorking,
+                          onChanged: (val) {
+                            setState(() {
+                              day['is_working'] = val ? 1 : 0;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                    if (isWorking) ...[
                       Text(
-                        dayName(dayOfWeek),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        'Time: ${day['start_time']} - ${day['end_time']}',
+                      ),
+                      Text(
+                        'Break: ${day['break_start']} - ${day['break_end']}',
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Edit'),
+                          onPressed: () => _editWorkingHour(index),
                         ),
                       ),
-                      Switch(
-                        value: isWorking,
-                        onChanged: (val) async {
-                          await _updateWorkingDay(dayOfWeek, val);
-                        },
-                      ),
                     ],
-                  ),
-
-                  Text(
-                    isWorking ? 'Working Day' : 'Off Day',
-                    style: TextStyle(
-                      color: isWorking ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                  if (isWorking && hour != null) ...[
-                    const SizedBox(height: 8),
-                    Text('Time: ${hour['start_time']} - ${hour['end_time']}'),
-                    Text('Break: ${hour['break_start']} - ${hour['break_end']}'),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit'),
-                        onPressed: () {
-                          _editWorkingHour(dayOfWeek, hour!);
-                        },
-                      ),
-                    )
                   ],
-                ],
+                ),
               ),
+            );
+          }).toList(),
+
+          /// 👇👇 ADD THIS PART EXACTLY HERE 👇👇
+            const SizedBox(height: 20),
+
+            ElevatedButton.icon(
+              onPressed: _saveWorkingSchedule,
+              icon: const Icon(Icons.save),
+              label: const Text('Save Working Schedule'),
             ),
-          );
-        }).toList(),
 
         ],
       ),

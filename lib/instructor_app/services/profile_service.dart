@@ -13,17 +13,20 @@ class ProfileService {
     return data['data'] ?? [];
   }
 
-  static Future<List> getWorkingHours(String id) async {
-    final res = await ApiClient.get('/ds/instructor-working-hours/$id');
-    final data = jsonDecode(res.body);
-    return data['data'] ?? [];
+  // static Future<List> getWorkingHours(String id) async {
+  //   final res = await ApiClient.get('/ds/instructor-working-hours/$id');
+  //   final data = jsonDecode(res.body);
+  //   return data['data'] ?? [];
+  // }
+
+  static Future<void> upsertWorkingDays(Map<String, dynamic> body) async {
+    await ApiClient.post(
+      '/ds/instructor-working-days/upsert',
+      body,
+    );
   }
 
-  static Future<void> createWorkingDay(Map<String, dynamic> body) async {
-    await ApiClient.post('/ds/instructor-working-days', body);
-  }
-
-  static Future<void> createWorkingHour(Map<String, dynamic> body) async {
-    await ApiClient.post('/ds/instructor-working-hours', body);
-  }
+  // static Future<void> createWorkingHour(Map<String, dynamic> body) async {
+  //   await ApiClient.post('/ds/instructor-working-hours', body);
+  // }
 }
