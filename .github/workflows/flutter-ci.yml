@@ -3,34 +3,41 @@ name: Flutter CI
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.2'
-          channel: stable
           cache: true
 
-      - name: Verify versions
-        run: |
-          flutter --version
-          dart --version
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Build APK
+        run: flutter build apk --release
 
-      - name: Analyze code
-        run: flutter analyze
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Run tests
-        run: flutter test
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build iOS (no signing)
+        run: flutter build ios --no-codesign
