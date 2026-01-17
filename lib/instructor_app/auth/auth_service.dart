@@ -14,8 +14,6 @@ class AuthService {
 
     final data = jsonDecode(response.body);
 
-    print(data);
-
     if (response.statusCode == 200 && data['success'] == true) {
       await TokenStorage.saveToken(data['access_token']);
 

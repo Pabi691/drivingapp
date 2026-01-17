@@ -16,20 +16,32 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> login(String email, String password) async {
     _isLoading = true;
-    notifyListeners();
-
+    
     try {
       await AuthService.login(email, password);
 
       final instructorJson = await TokenStorage.getInstructor();
+      
       if (instructorJson != null) {
         _instructor = jsonDecode(instructorJson);
         _isAuthenticated = true;
+        notifyListeners();
       }
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
+      throw Exception('Invalid login response');
+
+    } catch (e) {
+      _setLoading(false);
+      rethrow;
     }
+
+    _setLoading(false);
+  }
+
+  void _setLoading(bool value) {
+    if (_isLoading == value) return;
+    _isLoading = value;
+    notifyListeners(); // ✅ UI only
   }
 
   Future<void> logout() async {
