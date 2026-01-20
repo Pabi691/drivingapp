@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/pupil_service.dart';
 import 'add_pupil_screen.dart';
+import 'pupil_details_screen.dart';
 
 class PupilsScreen extends StatefulWidget {
   const PupilsScreen({super.key});
@@ -84,7 +85,6 @@ class _PupilsScreenState extends State<PupilsScreen>
       setState(() {}); // reload list
     }
   }
-
   // -------------------------------
   // PUPIL LIST (API)
   // -------------------------------
@@ -138,7 +138,12 @@ class _PupilsScreenState extends State<PupilsScreen>
                 ],
               ),
               onTap: () {
-                // TODO: Open pupil details
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PupilDetailsScreen(pupil: p),
+                  ),
+                );
               },
             );
           },

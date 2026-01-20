@@ -21,15 +21,15 @@ class AuthProvider with ChangeNotifier {
       await AuthService.login(email, password);
 
       final instructorJson = await TokenStorage.getInstructor();
-      
-      if (instructorJson != null) {
-        _instructor = jsonDecode(instructorJson);
-        _isAuthenticated = true;
-        notifyListeners();
+      // print(instructorJson);
+      if (instructorJson == null) {
+        throw Exception('Invalid login response');
+        // notifyListeners();
       }
+      _instructor = jsonDecode(instructorJson);
+      _isAuthenticated = true;
       _setLoading(false);
-      throw Exception('Invalid login response');
-
+      
     } catch (e) {
       _setLoading(false);
       rethrow;

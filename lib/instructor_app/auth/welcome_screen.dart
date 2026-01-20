@@ -40,7 +40,6 @@ class WelcomeScreen extends StatelessWidget {
 
               ElevatedButton(
                 onPressed: () {
-                  // PIN is already "validated" internally
                   _validatePinAndContinue(context);
                 },
                 style: ElevatedButton.styleFrom(
@@ -61,18 +60,17 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
 
-              TextButton(
-                onPressed: () {
-                  context.go('/login');
-                },
-                child: const Text(
-                  'Instructor Login',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
+              // TextButton(
+              //   onPressed: () {
+              //     context.go('/login');
+              //   },
+              //   child: const Text(
+              //     'Instructor Login',
+              //     style: TextStyle(color: Colors.white),
+              //   ),
+              // ),
             ],
           ),
         ),
