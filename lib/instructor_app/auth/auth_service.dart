@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 import '../utils/token_storage.dart';
 
@@ -13,15 +14,47 @@ class AuthService {
     );
 
     final data = jsonDecode(response.body);
+    debugPrint('AuthService: Login response: $data');
 
     if (response.statusCode == 200 && data['success'] == true) {
-      await TokenStorage.saveToken(data['access_token']);
+      final token = data['token'] ?? data['access_token']; // Handle both keys
+      if (token == null) throw Exception('No token in response');
+      await TokenStorage.saveToken(token);
 
       // save instructor data
-      await TokenStorage.saveInstructor(jsonEncode(data['instructor_data']));
+      // save instructor data
+      if (data['instructor_data'] != null) {
+        await TokenStorage.saveInstructor(jsonEncode(data['instructor_data']));
+      } else {
+        debugPrint('AuthService: instructor_data missing, fetching from API...');
+        // Fetch all instructors and find the one matching the user ID
+        try {
+          final userId = data['user']['_id'];
+          final instructorsRes = await ApiClient.getInstructors(); // Assuming this exists
+          final instructorsData = ApiClient.decodeResponse(instructorsRes);
+          final List instructors = instructorsData['data'] ?? [];
+          
+          final instructor = instructors.firstWhere(
+            (i) => i['instructor_user_id'] == userId, 
+            orElse: () => null,
+          );
+
+          if (instructor != null) {
+             debugPrint('AuthService: Found instructor via API: $instructor');
+             await TokenStorage.saveInstructor(jsonEncode(instructor));
+          } else {
+             debugPrint('AuthService: Error - Could not find instructor record for user $userId');
+          }
+
+        } catch (e) {
+          debugPrint('AuthService: Error fetching instructor details: $e');
+        }
+      }
 
       // Optionally save user data if needed
-      await TokenStorage.saveUser(jsonEncode(data['user']));
+      if (data['user'] != null) {
+        await TokenStorage.saveUser(jsonEncode(data['user']));
+      }
     } else {
       throw Exception(data['message'] ?? 'Login failed');
     }

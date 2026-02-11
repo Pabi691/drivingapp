@@ -56,7 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${dayName(day['day_of_week'])}'),
+        title: Text(dayName(day['day_of_week'])),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -132,6 +132,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     await ProfileService.upsertWorkingDays(payload);
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Schedule saved')),
@@ -219,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             );
-          }).toList(),
+          }),
 
           /// 👇👇 ADD THIS PART EXACTLY HERE 👇👇
             const SizedBox(height: 20),

@@ -26,7 +26,8 @@ class AuthProvider with ChangeNotifier {
         throw Exception('Invalid login response');
         // notifyListeners();
       }
-      _instructor = jsonDecode(instructorJson);
+      _instructor = jsonDecode(instructorJson!); // Force unwrap as we check for null above
+      debugPrint('AuthProvider: Login successful, instructor: $_instructor');
       _isAuthenticated = true;
       _setLoading(false);
       
@@ -58,8 +59,10 @@ class AuthProvider with ChangeNotifier {
 
     if (token != null && instructorJson != null) {
       _instructor = jsonDecode(instructorJson);
+      debugPrint('AuthProvider: Restored instructor: $_instructor');
       _isAuthenticated = true;
     } else {
+      debugPrint('AuthProvider: No token or instructor found');
       _isAuthenticated = false;
     }
 

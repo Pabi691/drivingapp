@@ -2,7 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:provider/provider.dart';
 
+import '../auth/auth_provider.dart';
+import '../providers/booking_provider.dart';
 import '../models/event.dart';
 import 'total_drive_screen.dart';
 
@@ -22,103 +25,19 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
+    
+    // Fetch bookings on load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final instructorId = context.read<AuthProvider>().instructorId;
+      if (instructorId != null) {
+        context.read<BookingProvider>().fetchBookings(instructorId);
+      }
+    });
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDay ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null && picked != _selectedDay) {
-      setState(() {
-        _selectedDay = picked;
-        _focusedDay = picked;
-      });
-    }
-  }
-
-  void _showAddOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.school),
-              title: const Text('Add Lesson'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
-                      selectedDate: _selectedDay ?? DateTime.now(),
-                      selectedHour: TimeOfDay.now().hour,
-                      initialTabIndex: 0,
-                    ),
-                  ),
-                ).then((_) => setState(() {}));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.hourglass_empty),
-              title: const Text('Add Gap'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
-                      selectedDate: _selectedDay ?? DateTime.now(),
-                      selectedHour: TimeOfDay.now().hour,
-                      initialTabIndex: 1,
-                    ),
-                  ),
-                ).then((_) => setState(() {}));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.directions_car),
-              title: const Text('Add Away'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
-                      selectedDate: _selectedDay ?? DateTime.now(),
-                      selectedHour: TimeOfDay.now().hour,
-                      initialTabIndex: 2,
-                    ),
-                  ),
-                ).then((_) => setState(() {}));
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildCalendar(),
-          Expanded(child: _buildHourlyTimeline()),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddOptions(context),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
+  // -------------------------
+  // APP BAR
+  // -------------------------
   AppBar _buildAppBar() {
     return AppBar(
       flexibleSpace: Container(
@@ -157,14 +76,143 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: () {
-            // Handle refreshing data
+             final instructorId = context.read<AuthProvider>().instructorId;
+             if (instructorId != null) {
+               context.read<BookingProvider>().fetchBookings(instructorId);
+             }
           },
         ),
       ],
     );
   }
 
-  Widget _buildCalendar() {
+  // -------------------------
+  // DATE SELECTION
+  // -------------------------
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDay ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _selectedDay) {
+      setState(() {
+        _selectedDay = picked;
+        _focusedDay = picked;
+      });
+    }
+  }
+
+  // -------------------------
+  // ADD OPTIONS BOTTOM SHEET
+  // -------------------------
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.school),
+              title: const Text('Add Lesson'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TotalDriveScreen(
+                      selectedDate: _selectedDay ?? DateTime.now(),
+                      selectedHour: TimeOfDay.now().hour,
+                      initialTabIndex: 0,
+                    ),
+                  ),
+                ).then((_) {
+                  final instructorId = context.read<AuthProvider>().instructorId;
+                  if (instructorId != null) {
+                    context.read<BookingProvider>().fetchBookings(instructorId);
+                  }
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.hourglass_empty),
+              title: const Text('Add Gap'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TotalDriveScreen(
+                      selectedDate: _selectedDay ?? DateTime.now(),
+                      selectedHour: TimeOfDay.now().hour,
+                      initialTabIndex: 1,
+                    ),
+                  ),
+                ).then((_) {
+                  final instructorId = context.read<AuthProvider>().instructorId;
+                  if (instructorId != null) {
+                    context.read<BookingProvider>().fetchBookings(instructorId);
+                  }
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.directions_car),
+              title: const Text('Add Away'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TotalDriveScreen(
+                      selectedDate: _selectedDay ?? DateTime.now(),
+                      selectedHour: TimeOfDay.now().hour,
+                      initialTabIndex: 2,
+                    ),
+                  ),
+                ).then((_) {
+                  final instructorId = context.read<AuthProvider>().instructorId;
+                  if (instructorId != null) {
+                    context.read<BookingProvider>().fetchBookings(instructorId);
+                  }
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: Consumer<BookingProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+             return const Center(child: CircularProgressIndicator());
+          }
+          
+          return Column(
+            children: [
+              _buildCalendar(provider),
+              Expanded(child: _buildHourlyTimeline(provider)),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddOptions(context),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+
+
+  Widget _buildCalendar(BookingProvider provider) {
     return Container(
       color: Colors.white,
       child: TableCalendar(
@@ -174,6 +222,12 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         calendarFormat: _calendarFormat,
         startingDayOfWeek: StartingDayOfWeek.monday,
+        
+        eventLoader: (day) {
+             final normalized = DateTime(day.year, day.month, day.day);
+             return provider.bookings[normalized] ?? [];
+        },
+        
         headerStyle: const HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,
@@ -183,7 +237,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         ),
         calendarStyle: CalendarStyle(
           todayDecoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.5),
+            color: Colors.blue.withValues(alpha: 0.5),
             shape: BoxShape.circle,
           ),
           selectedDecoration: const BoxDecoration(
@@ -218,18 +272,16 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     );
   }
 
-  Widget _buildHourlyTimeline() {
+  Widget _buildHourlyTimeline(BookingProvider provider) {
     final selectedDate = _selectedDay ?? DateTime.now();
-    final todaysEvents = events.where((event) {
-      return event.startTime.year == selectedDate.year &&
-          event.startTime.month == selectedDate.month &&
-          event.startTime.day == selectedDate.day;
-    }).toList();
+    final normalized = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final todaysEvents = provider.bookings[normalized] ?? [];
 
     return ListView.builder(
       itemCount: 24,
       itemBuilder: (context, index) {
         final hour = index.toString().padLeft(2, '0');
+        // Filter purely by hour matches if start time falls in this hour
         final hourEvents = todaysEvents.where((event) => event.startTime.hour == index).toList();
 
         return GestureDetector(
@@ -242,7 +294,10 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                   selectedHour: index,
                 ),
               ),
-            ).then((_) => setState(() {}));
+            ).then((_) {
+                 final instructorId = context.read<AuthProvider>().instructorId;
+                 if (instructorId != null) context.read<BookingProvider>().fetchBookings(instructorId);
+            }); // Refresh on return
           },
           child: Container(
             height: 60.0,
@@ -266,10 +321,14 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                         top: event.startTime.minute.toDouble(),
                         left: 0,
                         right: 0,
-                        height: event.duration.inMinutes.toDouble(),
+                        height: event.duration.inMinutes.toDouble() > 0 ? event.duration.inMinutes.toDouble() : 30.0,
                         child: Container(
                           color: event.color,
-                          child: Text(event.title, style: const TextStyle(color: Colors.white)),
+                          child: Text(
+                              event.title, 
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       );
                     }).toList(),

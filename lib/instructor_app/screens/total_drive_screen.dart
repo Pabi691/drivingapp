@@ -1,7 +1,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../auth/auth_provider.dart';
+import '../providers/booking_provider.dart';
+import '../providers/pupil_provider.dart';
 import '../models/event.dart';
 
 class TotalDriveScreen extends StatefulWidget {
@@ -24,59 +28,85 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
   late TabController _tabController;
   late DateTime _date;
   late TimeOfDay _time;
-  int _durationInMinutes = 60;
-
-  bool _showLessonAdvanced = false;
-  bool _showGapAdvanced = false;
-  bool _showAwayAdvanced = false;
-
+  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
     _date = widget.selectedDate;
     _time = TimeOfDay(hour: widget.selectedHour, minute: 0);
+
+    // Ensure pupils are loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pupilProvider = context.read<PupilProvider>();
+      if (pupilProvider.pupils.isEmpty) {
+        pupilProvider.fetchPupils();
+      }
+    });
   }
+  
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  String? _selectedPupilId;
+  int _durationInMinutes = 60;
+  bool _isLoading = false;
+  bool _showLessonAdvanced = false;
+  bool _showGapAdvanced = false;
+  bool _showAwayAdvanced = false;
 
-  void _saveEvent() {
-    final startTime = DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
-    final duration = Duration(minutes: _durationInMinutes);
-    String title = '';
-    Color color = Colors.grey;
-
-    switch (_tabController.index) {
-      case 0:
-        title = 'Lesson';
-        color = Colors.blue;
-        break;
-      case 1:
-        title = 'Gap';
-        color = Colors.orange;
-        break;
-      case 2:
-        title = 'Away';
-        color = Colors.red;
-        break;
+  void _saveEvent() async {
+    if (_tabController.index != 0) {
+      // TODO: Handle Gap/Away saving if API supports it
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only Lessons supported via API for now')));
+      return;
     }
 
-    final newEvent = Event(
-      title: title,
-      startTime: startTime,
-      duration: duration,
-      color: color,
-    );
+    if (_selectedPupilId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a pupil')));
+      return;
+    }
 
-    setState(() {
-      events.add(newEvent);
-    });
+    setState(() => _isLoading = true);
 
-    Navigator.pop(context);
+    try {
+      final instructorId = context.read<AuthProvider>().instructorId;
+      if (instructorId == null) throw Exception('Instructor not logged in');
+
+      final dateStr = DateFormat('yyyy-MM-dd').format(_date);
+      final startTimeStr = _time.format(context).split(' ')[0]; // Basic format, might need 24h conversion
+      // Better ensure 24h format for API:
+      final startHour = _time.hour.toString().padLeft(2, '0');
+      final startMinute = _time.minute.toString().padLeft(2, '0');
+      final formattedStartTime = '$startHour:$startMinute';
+      
+      // Calculate End Time
+      final startDateTime = DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
+      final endDateTime = startDateTime.add(Duration(minutes: _durationInMinutes));
+      final endHour = endDateTime.hour.toString().padLeft(2, '0');
+      final endMinute = endDateTime.minute.toString().padLeft(2, '0');
+      final formattedEndTime = '$endHour:$endMinute';
+
+      final bookingData = {
+        "pupil_id": _selectedPupilId,
+        "instructor_id": instructorId,
+        "booking_date": dateStr,
+        "start_time": formattedStartTime,
+        "end_time": formattedEndTime
+      };
+
+      await context.read<BookingProvider>().createBooking(bookingData);
+
+      if (mounted) {
+        Navigator.pop(context); // Close screen
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking created successfully')));
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+       if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -85,10 +115,13 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       appBar: AppBar(
         title: const Text('Total Drive'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _saveEvent,
-          ),
+          if (_isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Colors.white)))
+          else
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _saveEvent,
+            ),
         ],
       ),
       body: Column(
@@ -117,12 +150,28 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
   }
 
   Widget _buildLessonTab() {
+    // Access pupils from provider
+    final pupils = context.watch<PupilProvider>().activePupils;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTextField(label: 'Pupil'),
+          DropdownButtonFormField<String>(
+            value: _selectedPupilId,
+            decoration: const InputDecoration(
+              labelText: 'Pupil',
+              border: OutlineInputBorder(),
+            ),
+            items: pupils.map<DropdownMenuItem<String>>((p) {
+              return DropdownMenuItem(
+                value: p['_id'],
+                child: Text(p['full_name'] ?? 'Unnamed'),
+              );
+            }).toList(),
+            onChanged: (val) => setState(() => _selectedPupilId = val),
+          ),
           const SizedBox(height: 16),
           _buildDateTimeField(label: 'Date', value: DateFormat.yMMMMd().format(_date)),
           const SizedBox(height: 16),

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/pupil_provider.dart';
+import 'add_pupil_screen.dart';
 
 class PupilDetailsScreen extends StatelessWidget {
-    final Map pupil;
+    final Map<String, dynamic> pupil;
 
     const PupilDetailsScreen({
         super.key,
@@ -119,6 +122,9 @@ class PupilDetailsScreen extends StatelessWidget {
   // -------------------------
   // ACTION BUTTONS
   // -------------------------
+  // -------------------------
+  // ACTION BUTTONS
+  // -------------------------
   Widget _actionButtons(BuildContext context) {
     return Row(
       children: [
@@ -127,7 +133,16 @@ class PupilDetailsScreen extends StatelessWidget {
             icon: const Icon(Icons.edit),
             label: const Text('Edit'),
             onPressed: () {
-              // TODO: Open edit screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddPupilScreen(pupil: pupil),
+                ),
+              ).then((updated) {
+                if (updated == true) {
+                   Navigator.pop(context); // Go back to refresh list (or we could rely on provider)
+                }
+              });
             },
           ),
         ),
@@ -138,13 +153,40 @@ class PupilDetailsScreen extends StatelessWidget {
             label: const Text('Delete'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-            onPressed: () {
-              // TODO: Delete pupil
-            },
+            onPressed: () => _confirmDelete(context),
           ),
         ),
       ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Pupil'),
+        content: Text('Are you sure you want to delete ${pupil['full_name']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // close dialog
+              final provider = context.read<PupilProvider>();
+              await provider.deletePupil(pupil['_id']);
+              
+              if (context.mounted) {
+                 Navigator.pop(context); // back to list
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }

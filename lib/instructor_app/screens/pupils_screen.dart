@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/pupil_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/pupil_provider.dart';
+// import '../services/pupil_service.dart'; // No longer needed directly checking provider
 import 'add_pupil_screen.dart';
 import 'pupil_details_screen.dart';
 
@@ -18,6 +20,11 @@ class _PupilsScreenState extends State<PupilsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    
+            // Fetch pupils once when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PupilProvider>().fetchPupils();
+    });
   }
 
   @override
@@ -39,6 +46,10 @@ class _PupilsScreenState extends State<PupilsScreen>
             },
           ),
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => context.read<PupilProvider>().fetchPupils(),
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             onPressed: _openAddPupil,
           ),
@@ -47,6 +58,7 @@ class _PupilsScreenState extends State<PupilsScreen>
           controller: _tabController,
           isScrollable: true,
           tabs: const [
+            Tab(text: 'All'), // Debugging
             Tab(text: 'Active'),
             Tab(text: 'Waiting'),
             Tab(text: 'Inactive'),
@@ -55,15 +67,39 @@ class _PupilsScreenState extends State<PupilsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPupilList(status: 'active'),
-          _buildPupilList(status: 'waiting'),
-          _buildPupilList(status: 'inactive'),
-          _buildPupilList(status: 'enquiry'),
-          _buildPupilList(status: 'passed'),
-        ],
+      body: Consumer<PupilProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${provider.error}'),
+                  ElevatedButton(
+                    onPressed: () => provider.fetchPupils(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildPupilList(provider.pupils), // Show all
+              _buildPupilList(provider.activePupils),
+              _buildPupilList(provider.waitingPupils),
+              _buildPupilList(provider.inactivePupils),
+              _buildPupilList(provider.enquiryPupils),
+              _buildPupilList(provider.passedPupils),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddPupil,
@@ -81,70 +117,59 @@ class _PupilsScreenState extends State<PupilsScreen>
       MaterialPageRoute(builder: (_) => const AddPupilScreen()),
     );
 
-    if (added == true) {
-      setState(() {}); // reload list
+    if (added == true && mounted) {
+      context.read<PupilProvider>().fetchPupils();
     }
   }
+
   // -------------------------------
-  // PUPIL LIST (API)
+  // PUPIL LIST (LOCAL)
   // -------------------------------
-  Widget _buildPupilList({required String status}) {
-    return FutureBuilder<List>(
-      future: PupilService.getAllPupils(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+  Widget _buildPupilList(List<dynamic> pupils) {
+    if (pupils.isEmpty) {
+      return const Center(child: Text('No pupils found'));
+    }
 
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No pupils found'));
-        }
+    return ListView.separated(
+      itemCount: pupils.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final p = pupils[index];
 
-        // Optional status filter (future-ready)
-        final pupils = snapshot.data!;
+        final name = p['full_name'] ?? '';
+        final phone = p['phone'] ?? '';
+        final hours = p['remaining_hour'] ?? 0;
 
-        return ListView.separated(
-          itemCount: pupils.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final p = pupils[index];
-
-            final name = p['full_name'] ?? '';
-            final phone = p['phone'] ?? '';
-            final hours = p['remaining_hour'] ?? 0;
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.blue.shade100,
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.blue.shade100,
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          title: Text(name),
+          subtitle: Text(phone.isNotEmpty ? phone : 'No lesson booked'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$hours hrs',
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              title: Text(name),
-              subtitle: Text(phone.isNotEmpty ? phone : 'No lesson booked'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$hours hrs',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right),
-                ],
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PupilDetailsScreen(pupil: p),
               ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PupilDetailsScreen(pupil: p),
-                  ),
-                );
-              },
             );
           },
         );
