@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -25,8 +24,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    
-    // Fetch bookings on load
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final instructorId = context.read<AuthProvider>().instructorId;
       if (instructorId != null) {
@@ -35,9 +33,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     });
   }
 
-  // -------------------------
-  // APP BAR
-  // -------------------------
   AppBar _buildAppBar() {
     return AppBar(
       flexibleSpace: Container(
@@ -55,9 +50,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
       ),
       leading: IconButton(
         icon: const Icon(Icons.menu, color: Colors.white),
-        onPressed: () {
-          // Handle drawer opening
-        },
+        onPressed: () {},
       ),
       actions: [
         TextButton(
@@ -76,19 +69,16 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: () {
-             final instructorId = context.read<AuthProvider>().instructorId;
-             if (instructorId != null) {
-               context.read<BookingProvider>().fetchBookings(instructorId);
-             }
+            final instructorId = context.read<AuthProvider>().instructorId;
+            if (instructorId != null) {
+              context.read<BookingProvider>().fetchBookings(instructorId);
+            }
           },
         ),
       ],
     );
   }
 
-  // -------------------------
-  // DATE SELECTION
-  // -------------------------
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -104,9 +94,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     }
   }
 
-  // -------------------------
-  // ADD OPTIONS BOTTOM SHEET
-  // -------------------------
   void _showAddOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -185,6 +172,72 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     );
   }
 
+  Future<void> _showBookingStatusSheet(Event event) async {
+    final String? selectedStatus = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(event.title),
+                subtitle: Text('Current status: ${_formatStatus(event.status)}'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+                title: const Text('Completed'),
+                onTap: () => Navigator.pop(context, 'completed'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined, color: Colors.red),
+                title: const Text('Cancelled'),
+                onTap: () => Navigator.pop(context, 'cancelled'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.pending_outlined, color: Colors.orange),
+                title: const Text('Pending'),
+                onTap: () => Navigator.pop(context, 'pending'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selectedStatus == null || selectedStatus == event.status) {
+      return;
+    }
+
+    final instructorId = context.read<AuthProvider>().instructorId;
+    if (instructorId == null || event.id.isEmpty) {
+      return;
+    }
+
+    try {
+      await context.read<BookingProvider>().updateBookingStatus(
+            bookingId: event.id,
+            status: selectedStatus,
+            instructorId: instructorId,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Booking marked ${_formatStatus(selectedStatus)}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
+      );
+    }
+  }
+
+  String _formatStatus(String status) {
+    if (status.isEmpty) return 'Unknown';
+    return status[0].toUpperCase() + status.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,9 +245,32 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
       body: Consumer<BookingProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-             return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
-          
+          if (provider.error != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Failed to load bookings: ${provider.error}'),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        final instructorId = context.read<AuthProvider>().instructorId;
+                        if (instructorId != null) {
+                          context.read<BookingProvider>().fetchBookings(instructorId);
+                        }
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           return Column(
             children: [
               _buildCalendar(provider),
@@ -210,8 +286,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     );
   }
 
-
-
   Widget _buildCalendar(BookingProvider provider) {
     return Container(
       color: Colors.white,
@@ -222,18 +296,51 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         calendarFormat: _calendarFormat,
         startingDayOfWeek: StartingDayOfWeek.monday,
-        
         eventLoader: (day) {
-             final normalized = DateTime(day.year, day.month, day.day);
-             return provider.bookings[normalized] ?? [];
+          final normalized = DateTime(day.year, day.month, day.day);
+          return provider.bookings[normalized] ?? [];
         },
-        
         headerStyle: const HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,
-          titleTextStyle: TextStyle(fontSize: 0), // Hide original title
+          titleTextStyle: TextStyle(fontSize: 0),
           leftChevronVisible: false,
           rightChevronVisible: false,
+        ),
+        calendarBuilders: CalendarBuilders(
+          markerBuilder: (context, day, events) {
+            if (events.isEmpty) return const SizedBox.shrink();
+            final bookingEvents = events.whereType<Event>().toList();
+            if (bookingEvents.isEmpty) return const SizedBox.shrink();
+
+            return Padding(
+              padding: const EdgeInsets.only(top: 26),
+              child: Wrap(
+                spacing: 2,
+                runSpacing: 2,
+                alignment: WrapAlignment.center,
+                children: bookingEvents.take(2).map((event) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: event.color,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      event.status.length > 3
+                          ? event.status.substring(0, 3).toUpperCase()
+                          : event.status.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          },
         ),
         calendarStyle: CalendarStyle(
           todayDecoration: BoxDecoration(
@@ -281,7 +388,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
       itemCount: 24,
       itemBuilder: (context, index) {
         final hour = index.toString().padLeft(2, '0');
-        // Filter purely by hour matches if start time falls in this hour
         final hourEvents = todaysEvents.where((event) => event.startTime.hour == index).toList();
 
         return GestureDetector(
@@ -295,9 +401,11 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                 ),
               ),
             ).then((_) {
-                 final instructorId = context.read<AuthProvider>().instructorId;
-                 if (instructorId != null) context.read<BookingProvider>().fetchBookings(instructorId);
-            }); // Refresh on return
+              final instructorId = context.read<AuthProvider>().instructorId;
+              if (instructorId != null) {
+                context.read<BookingProvider>().fetchBookings(instructorId);
+              }
+            });
           },
           child: Container(
             height: 60.0,
@@ -321,13 +429,34 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                         top: event.startTime.minute.toDouble(),
                         left: 0,
                         right: 0,
-                        height: event.duration.inMinutes.toDouble() > 0 ? event.duration.inMinutes.toDouble() : 30.0,
-                        child: Container(
-                          color: event.color,
-                          child: Text(
-                              event.title, 
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
+                        height: event.duration.inMinutes.toDouble() > 0
+                            ? event.duration.inMinutes.toDouble()
+                            : 30.0,
+                        child: GestureDetector(
+                          onTap: () => _showBookingStatusSheet(event),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            color: event.color,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  event.title,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  _formatStatus(event.status),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

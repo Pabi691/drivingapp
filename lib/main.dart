@@ -11,6 +11,7 @@ import 'instructor_app/screens/profile_screen.dart';
 
 import 'instructor_app/providers/pupil_provider.dart';
 import 'instructor_app/providers/booking_provider.dart';
+import 'instructor_app/providers/money_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PupilProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
+        ChangeNotifierProvider(create: (_) => MoneyProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {

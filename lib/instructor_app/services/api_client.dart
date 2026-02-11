@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../utils/token_storage.dart';
 
@@ -96,6 +95,28 @@ class ApiClient {
 
   static Future<http.Response> getBookingsByInstructor(String id) async {
     return get('/ds/bookings/$id');
+  }
+
+  static Future<http.Response> updateBookingStatus(
+    String id,
+    String status,
+  ) async {
+    return post('/ds/bookings/update-status/$id', {'status': status});
+  }
+
+  // Money
+  static Future<http.Response> createMoneyRecord(
+      Map<String, dynamic> body) async {
+    return post('/ds/money', body);
+  }
+
+  static Future<http.Response> updateMoneyRecord(
+      String id, Map<String, dynamic> body) async {
+    return post('/ds/money/$id', body);
+  }
+
+  static Future<http.Response> getMoneyByInstructor(String instructorId) async {
+    return get('/ds/money/instructor/$instructorId');
   }
 
   // Sale
