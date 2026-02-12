@@ -14,6 +14,13 @@ class PupilService {
     ApiClient.decodeResponse(res);
   }
 
+  // Get all bookings by pupil id
+  static Future<List> getBookingsByPupilId(String pupilId) async {
+    final res = await ApiClient.getBookingsByPupil(pupilId);
+    final data = ApiClient.decodeResponse(res);
+    return data['data'] ?? [];
+  }
+
   // Update pupil
   static Future<void> updatePupil(String id, Map<String, dynamic> body) async {
     final res = await ApiClient.post('/ds/pupils/$id', body);

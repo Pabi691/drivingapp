@@ -97,6 +97,10 @@ class ApiClient {
     return get('/ds/bookings/$id');
   }
 
+  static Future<http.Response> getBookingsByPupil(String pupilId) async {
+    return get('/ds/bookings/pupil/$pupilId');
+  }
+
   static Future<http.Response> updateBookingStatus(
     String id,
     String status,
