@@ -23,6 +23,61 @@ class _PupilDetailsScreenState extends State<PupilDetailsScreen> {
   String? _bookingsError;
   List<dynamic> _bookings = [];
 
+  double _totalPending = 0;
+  double _totalCompleted = 0;
+  double _totalRequested = 0;
+  double _totalCancelled = 0;
+
+  void _calculateBookingStats() {
+    _totalPending = 0;
+    _totalCompleted = 0;
+    _totalRequested = 0;
+    _totalCancelled = 0;
+
+    for (var b in _bookings) {
+      final status = _text(b['status']).toLowerCase();
+      final creditStr = _text(b['credit_use']);
+      final double credit = double.tryParse(creditStr) ?? 0.0;
+
+      if (status == 'pending') {
+        _totalPending += credit;
+      } else if (status == 'completed') {
+        _totalCompleted += credit;
+      } else if (status == 'booking_request') {
+        _totalRequested += credit;
+      } else if (status == 'cancelled') {
+        _totalCancelled += credit;
+      }
+    }
+  }
+
+  double _getPackageDuration(dynamic packageData) {
+    if (packageData == null) return 0.0;
+    final durationStr = packageData['duration']?.toString() ?? '0';
+    return double.tryParse(durationStr) ?? 0.0;
+  }
+
+  String _calculateRemaining(dynamic packageData) {
+    final duration = _getPackageDuration(packageData);
+    double consumed = _totalCompleted;
+    double remaining = duration - consumed;
+    if (remaining < 0) remaining = 0;
+    return remaining.toStringAsFixed(1).replaceAll('.0', '');
+  }
+
+  String _calculateProgress(dynamic packageData) {
+    final duration = _getPackageDuration(packageData);
+    if (duration <= 0) return '0';
+    double consumed = _totalCompleted;
+    int progress = ((consumed / duration) * 100).round();
+    if (progress > 100) progress = 100;
+    return progress.toString();
+  }
+
+  String _formatDouble(double val) {
+    return val.toStringAsFixed(1).replaceAll('.0', '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +105,7 @@ class _PupilDetailsScreenState extends State<PupilDetailsScreen> {
       setState(() {
         _bookings = bookings;
         _loadingBookings = false;
+        _calculateBookingStats();
       });
     } catch (e) {
       if (!mounted) return;
@@ -91,15 +147,25 @@ class _PupilDetailsScreenState extends State<PupilDetailsScreen> {
             _buildInfoCard(
               title: 'Learning Information',
               children: [
-                _infoTile(Icons.timer, 'Remaining Hours', '${widget.pupil['remaining_hour'] ?? 0} hrs'),
-                _infoTile(Icons.trending_up, 'Progress', '${widget.pupil['progress'] ?? 0}%'),
+                _infoTile(Icons.timer, 'Remaining Hours', '${_calculateRemaining(packageData)} hrs'),
+                _infoTile(Icons.trending_up, 'Progress', '${_calculateProgress(packageData)}%'),
                 _infoTile(Icons.location_on, 'Area', _text(area?['name'])),
                 _infoTile(Icons.school, 'Instructor', _text(instructor?['name'] ?? instructor?['email'])),
                 _infoTile(
                   Icons.inventory_2,
                   'Package Duration',
-                  packageData != null ? '${packageData['duration']} hrs' : 'N/A',
+                  packageData != null ? '${_formatDouble(_getPackageDuration(packageData))} hrs' : 'N/A',
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildInfoCard(
+              title: 'Booking Hours Summary',
+              children: [
+                _infoTile(Icons.hourglass_empty, 'Total Pending', '${_formatDouble(_totalPending)} hrs'),
+                _infoTile(Icons.assignment, 'Booking Requests', '${_formatDouble(_totalRequested)} hrs'),
+                _infoTile(Icons.check_circle, 'Total Completed', '${_formatDouble(_totalCompleted)} hrs'),
+                _infoTile(Icons.cancel, 'Total Cancelled', '${_formatDouble(_totalCancelled)} hrs'),
               ],
             ),
             const SizedBox(height: 12),
@@ -161,7 +227,7 @@ class _PupilDetailsScreenState extends State<PupilDetailsScreen> {
               ],
             ),
           ),
-          _chip('${widget.pupil['progress'] ?? 0}%'),
+          _chip('${_calculateProgress(widget.pupil['package_id'])}%'),
         ],
       ),
     );
@@ -203,7 +269,7 @@ class _PupilDetailsScreenState extends State<PupilDetailsScreen> {
           Icon(icon, size: 18, color: Colors.blueGrey),
           const SizedBox(width: 8),
           SizedBox(
-            width: 125,
+            width: 135,
             child: Text(
               label,
               style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),

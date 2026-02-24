@@ -53,12 +53,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

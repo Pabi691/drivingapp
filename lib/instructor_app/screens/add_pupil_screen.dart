@@ -90,6 +90,9 @@ class _AddPupilScreenState extends State<AddPupilScreen> {
       "instructor_id": instructorId,
       "area_id": areaId,
       if (packageId != null) "package_id": packageId,
+      "active": widget.pupil?['active'] ?? 1,
+      "payment_status": widget.pupil?['payment_status'] ?? 'unpaid',
+      "progress": widget.pupil?['progress'] ?? 0,
     };
 
     try {
