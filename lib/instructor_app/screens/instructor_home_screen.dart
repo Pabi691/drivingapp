@@ -20,16 +20,21 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
   DateTime? _selectedDay;
   CalendarFormat _calendarFormat = CalendarFormat.week;
 
+  void _refreshBookings() {
+    if (!mounted) return;
+    final instructorId = context.read<AuthProvider>().instructorId;
+    if (instructorId != null) {
+      context.read<BookingProvider>().fetchBookings(instructorId);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final instructorId = context.read<AuthProvider>().instructorId;
-      if (instructorId != null) {
-        context.read<BookingProvider>().fetchBookings(instructorId);
-      }
+      _refreshBookings();
     });
   }
 
@@ -68,12 +73,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.white),
-          onPressed: () {
-            final instructorId = context.read<AuthProvider>().instructorId;
-            if (instructorId != null) {
-              context.read<BookingProvider>().fetchBookings(instructorId);
-            }
-          },
+          onPressed: _refreshBookings,
         ),
       ],
     );
@@ -95,75 +95,61 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
   }
 
   void _showAddOptions(BuildContext context) {
+    final parentContext = context;
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return Wrap(
           children: [
             ListTile(
               leading: const Icon(Icons.school),
               title: const Text('Add Lesson'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 Navigator.push(
-                  context,
+                  parentContext,
                   MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
+                    builder: (_) => TotalDriveScreen(
                       selectedDate: _selectedDay ?? DateTime.now(),
                       selectedHour: TimeOfDay.now().hour,
                       initialTabIndex: 0,
                     ),
                   ),
-                ).then((_) {
-                  final instructorId = context.read<AuthProvider>().instructorId;
-                  if (instructorId != null) {
-                    context.read<BookingProvider>().fetchBookings(instructorId);
-                  }
-                });
+                ).then((_) => _refreshBookings());
               },
             ),
             ListTile(
               leading: const Icon(Icons.hourglass_empty),
               title: const Text('Add Gap'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 Navigator.push(
-                  context,
+                  parentContext,
                   MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
+                    builder: (_) => TotalDriveScreen(
                       selectedDate: _selectedDay ?? DateTime.now(),
                       selectedHour: TimeOfDay.now().hour,
                       initialTabIndex: 1,
                     ),
                   ),
-                ).then((_) {
-                  final instructorId = context.read<AuthProvider>().instructorId;
-                  if (instructorId != null) {
-                    context.read<BookingProvider>().fetchBookings(instructorId);
-                  }
-                });
+                ).then((_) => _refreshBookings());
               },
             ),
             ListTile(
               leading: const Icon(Icons.directions_car),
               title: const Text('Add Away'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 Navigator.push(
-                  context,
+                  parentContext,
                   MaterialPageRoute(
-                    builder: (context) => TotalDriveScreen(
+                    builder: (_) => TotalDriveScreen(
                       selectedDate: _selectedDay ?? DateTime.now(),
                       selectedHour: TimeOfDay.now().hour,
                       initialTabIndex: 2,
                     ),
                   ),
-                ).then((_) {
-                  final instructorId = context.read<AuthProvider>().instructorId;
-                  if (instructorId != null) {
-                    context.read<BookingProvider>().fetchBookings(instructorId);
-                  }
-                });
+                ).then((_) => _refreshBookings());
               },
             ),
           ],
@@ -209,6 +195,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     if (selectedStatus == null || selectedStatus == event.status) {
       return;
     }
+    if (!mounted) return;
 
     final instructorId = context.read<AuthProvider>().instructorId;
     if (instructorId == null || event.id.isEmpty) {
@@ -257,12 +244,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                     Text('Failed to load bookings: ${provider.error}'),
                     const SizedBox(height: 12),
                     ElevatedButton(
-                      onPressed: () {
-                        final instructorId = context.read<AuthProvider>().instructorId;
-                        if (instructorId != null) {
-                          context.read<BookingProvider>().fetchBookings(instructorId);
-                        }
-                      },
+                      onPressed: _refreshBookings,
                       child: const Text('Retry'),
                     ),
                   ],
@@ -395,17 +377,12 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => TotalDriveScreen(
+                builder: (_) => TotalDriveScreen(
                   selectedDate: _selectedDay ?? DateTime.now(),
                   selectedHour: index,
                 ),
               ),
-            ).then((_) {
-              final instructorId = context.read<AuthProvider>().instructorId;
-              if (instructorId != null) {
-                context.read<BookingProvider>().fetchBookings(instructorId);
-              }
-            });
+            ).then((_) => _refreshBookings());
           },
           child: Container(
             height: 60.0,

@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../auth/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/pupil_provider.dart';
-import '../models/event.dart';
 
 class TotalDriveScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -52,16 +51,27 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
   bool _showLessonAdvanced = false;
   bool _showGapAdvanced = false;
   bool _showAwayAdvanced = false;
+  String _repeat = 'no repeat';
+  String _gearbox = 'manual';
+  final TextEditingController _pickupController = TextEditingController();
+  final TextEditingController _dropoffController = TextEditingController();
+  final TextEditingController _privateNotesController = TextEditingController();
+  final TextEditingController _pupilSummaryController = TextEditingController();
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _pickupController.dispose();
+    _dropoffController.dispose();
+    _privateNotesController.dispose();
+    _pupilSummaryController.dispose();
+    super.dispose();
+  }
 
   void _saveEvent() async {
     if (_tabController.index != 0) {
       // TODO: Handle Gap/Away saving if API supports it
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only Lessons supported via API for now')));
-      return;
-    }
-
-    if (_selectedPupilId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a pupil')));
       return;
     }
 
@@ -72,8 +82,6 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       if (instructorId == null) throw Exception('Instructor not logged in');
 
       final dateStr = DateFormat('yyyy-MM-dd').format(_date);
-      final startTimeStr = _time.format(context).split(' ')[0]; // Basic format, might need 24h conversion
-      // Better ensure 24h format for API:
       final startHour = _time.hour.toString().padLeft(2, '0');
       final startMinute = _time.minute.toString().padLeft(2, '0');
       final formattedStartTime = '$startHour:$startMinute';
@@ -86,11 +94,21 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       final formattedEndTime = '$endHour:$endMinute';
 
       final bookingData = {
-        "pupil_id": _selectedPupilId,
+        "pupil_id": _selectedPupilId ?? '',
         "instructor_id": instructorId,
+        "title": "Lesson",
         "booking_date": dateStr,
         "start_time": formattedStartTime,
-        "end_time": formattedEndTime
+        "end_time": formattedEndTime,
+        "repeat": _repeat,
+        "gearbox": _gearbox,
+        "pickup": _pickupController.text.trim(),
+        "dropoff": _dropoffController.text.trim(),
+        "private_notes": _privateNotesController.text.trim(),
+        "pupil_summary": _pupilSummaryController.text.trim(),
+        "status": "booking_request",
+        "payment_status": "pending",
+        "payment_type": "cash",
       };
 
       await context.read<BookingProvider>().createBooking(bookingData);
@@ -159,7 +177,7 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<String>(
-            value: _selectedPupilId,
+            initialValue: _selectedPupilId,
             decoration: const InputDecoration(
               labelText: 'Pupil',
               border: OutlineInputBorder(),
@@ -179,7 +197,14 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
           const SizedBox(height: 16),
           _buildDurationField(),
           const SizedBox(height: 16),
-          _buildDropdownField(label: 'Repeat', value: 'No Repeat', items: ['No Repeat']),
+          _buildDropdownField(
+            label: 'Repeat',
+            value: _repeat,
+            items: const ['no repeat', 'repeat'],
+            onChanged: (val) {
+              if (val != null) setState(() => _repeat = val);
+            },
+          ),
           const SizedBox(height: 24),
           _buildAdvancedOptionsToggle('Lesson'),
           if (_showLessonAdvanced) _buildAdvancedLessonOptions(),
@@ -200,7 +225,14 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
           const SizedBox(height: 16),
           _buildDurationField(),
           const SizedBox(height: 16),
-          _buildDropdownField(label: 'Gearbox', value: 'Manual Drive', items: ['Manual Drive']),
+          _buildDropdownField(
+            label: 'Gearbox',
+            value: _gearbox,
+            items: const ['manual', 'automatic'],
+            onChanged: (val) {
+              if (val != null) setState(() => _gearbox = val);
+            },
+          ),
           const SizedBox(height: 16),
           _buildDropdownField(label: 'Notify', value: 'Send Notification', items: ['Send Notification']),
           const SizedBox(height: 24),
@@ -230,8 +262,9 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildTextField({required String label}) {
+  Widget _buildTextField({required String label, TextEditingController? controller}) {
     return TextFormField(
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -271,7 +304,12 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildDropdownField({required String label, required String value, required List<String> items}) {
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    ValueChanged<String?>? onChanged,
+  }) {
     return Row(
       children: [
         Text(label, style: const TextStyle(fontSize: 16)),
@@ -284,7 +322,7 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
               child: Text(value),
             );
           }).toList(),
-          onChanged: (_) {},
+          onChanged: onChanged,
         ),
       ],
     );
@@ -319,17 +357,24 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        _buildDropdownField(label: 'Gearbox', value: 'Manual Drive', items: ['Manual Drive']),
+        _buildDropdownField(
+          label: 'Gearbox',
+          value: _gearbox,
+          items: const ['manual', 'automatic'],
+          onChanged: (val) {
+            if (val != null) setState(() => _gearbox = val);
+          },
+        ),
         const SizedBox(height: 16),
         _buildDropdownField(label: 'Type', value: 'Lesson', items: ['Lesson']),
         const SizedBox(height: 16),
-        _buildTextField(label: 'Pick-up (optional)'),
+        _buildTextField(label: 'Pick-up (optional)', controller: _pickupController),
         const SizedBox(height: 16),
-        _buildTextField(label: 'Drop-off (optional)'),
+        _buildTextField(label: 'Drop-off (optional)', controller: _dropoffController),
         const SizedBox(height: 16),
-        _buildTextField(label: 'Private Notes (optional)'),
+        _buildTextField(label: 'Private Notes (optional)', controller: _privateNotesController),
         const SizedBox(height: 16),
-        _buildTextField(label: 'Shared Pupil Summary (optional)'),
+        _buildTextField(label: 'Shared Pupil Summary (optional)', controller: _pupilSummaryController),
       ],
     );
   }
@@ -339,7 +384,14 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        _buildDropdownField(label: 'Repeat', value: 'No Repeat', items: ['No Repeat']),
+        _buildDropdownField(
+          label: 'Repeat',
+          value: _repeat,
+          items: const ['no repeat', 'repeat'],
+          onChanged: (val) {
+            if (val != null) setState(() => _repeat = val);
+          },
+        ),
         const SizedBox(height: 16),
         _buildTextField(label: 'Location (optional)'),
         const SizedBox(height: 16),
@@ -353,7 +405,14 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        _buildDropdownField(label: 'Repeat', value: 'No Repeat', items: ['No Repeat']),
+        _buildDropdownField(
+          label: 'Repeat',
+          value: _repeat,
+          items: const ['no repeat', 'repeat'],
+          onChanged: (val) {
+            if (val != null) setState(() => _repeat = val);
+          },
+        ),
         const SizedBox(height: 16),
         _buildTextField(label: 'Private Notes (optional)'),
       ],

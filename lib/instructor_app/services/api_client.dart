@@ -8,14 +8,24 @@ class ApiClient {
 
   static Map<String, dynamic> decodeResponse(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-       // Try to parse error message
-       try {
-         final errorData = jsonDecode(response.body);
-         final message = errorData is Map ? errorData['message'] : 'Request failed';
-         throw Exception(message ?? 'Request failed with status ${response.statusCode}');
-       } catch (e) {
-         throw Exception('Request failed with status ${response.statusCode}');
-       }
+      String? message;
+
+      // Try to parse server-provided error details first.
+      try {
+        final errorData = jsonDecode(response.body);
+        if (errorData is Map) {
+          message =
+              errorData['message']?.toString() ?? errorData['error']?.toString();
+        }
+      } catch (_) {
+        // Ignore JSON parse failures and fall back to status-based message.
+      }
+
+      throw Exception(
+        (message != null && message.trim().isNotEmpty)
+            ? message
+            : 'Request failed with status ${response.statusCode}',
+      );
     }
 
     final dynamic decoded = jsonDecode(response.body);

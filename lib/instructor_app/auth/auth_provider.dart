@@ -11,7 +11,35 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
 
-  String? get instructorId => _instructor?['_id']?.toString();
+  String? get instructorId {
+    final data = _instructor;
+    if (data == null) return null;
+
+    // Instructor master record commonly includes this field.
+    if (data['instructor_user_id'] != null) {
+      return data['_id']?.toString();
+    }
+
+    // Some auth responses embed instructor details.
+    final embeddedInstructor = data['instructor_data'];
+    if (embeddedInstructor is Map) {
+      final id = embeddedInstructor['_id']?.toString();
+      if (id != null && id.isNotEmpty) return id;
+    }
+
+    // Some responses include an instructor_id pointer.
+    final rawInstructorId = data['instructor_id'];
+    if (rawInstructorId is Map) {
+      final id = rawInstructorId['_id']?.toString();
+      if (id != null && id.isNotEmpty) return id;
+    } else if (rawInstructorId != null) {
+      final id = rawInstructorId.toString();
+      if (id.isNotEmpty) return id;
+    }
+
+    // Fallback only when no explicit instructor reference exists.
+    return data['_id']?.toString();
+  }
   Map<String, dynamic>? get instructor => _instructor;
 
   Future<void> login(String email, String password) async {
@@ -26,7 +54,7 @@ class AuthProvider with ChangeNotifier {
         throw Exception('Invalid login response');
         // notifyListeners();
       }
-      _instructor = jsonDecode(instructorJson!); // Force unwrap as we check for null above
+      _instructor = jsonDecode(instructorJson);
       debugPrint('AuthProvider: Login successful, instructor: $_instructor');
       _isAuthenticated = true;
       _setLoading(false);

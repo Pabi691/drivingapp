@@ -17,13 +17,23 @@ class BookingProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Backend returns booking list from /ds/bookings (sometimes even with 201),
-      // so load all and filter by instructor on client.
-      final res = await ApiClient.getBookings();
-      final data = ApiClient.decodeResponse(res);
-      final List<dynamic> bookingList = _extractBookingList(data)
-          .where((b) => _belongsToInstructor(b, instructorId))
-          .toList();
+      // Prefer instructor-scoped endpoint; some backends reject plain /ds/bookings with 400.
+      Map<String, dynamic> data;
+      bool usedScopedEndpoint = false;
+      try {
+        final res = await ApiClient.getBookingsByInstructor(instructorId);
+        data = ApiClient.decodeResponse(res);
+        usedScopedEndpoint = true;
+      } catch (_) {
+        // Fallback for backends that only support global booking list.
+        final fallbackRes = await ApiClient.getBookings();
+        data = ApiClient.decodeResponse(fallbackRes);
+      }
+
+      final extracted = _extractBookingList(data);
+      final List<dynamic> bookingList = usedScopedEndpoint
+          ? extracted
+          : extracted.where((b) => _belongsToInstructor(b, instructorId)).toList();
 
       _bookings = {};
 
@@ -93,11 +103,17 @@ class BookingProvider with ChangeNotifier {
 
   Future<void> createBooking(Map<String, dynamic> bookingData) async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
       final res = await ApiClient.createBooking(bookingData);
-      ApiClient.decodeResponse(res);
+      final data = ApiClient.decodeResponse(res);
+      final isSuccess = data['success'];
+      if (isSuccess == false) {
+        final message = data['message']?.toString() ?? 'Booking creation failed';
+        throw Exception(message);
+      }
 
       final instructorId = bookingData['instructor_id'];
       if (instructorId != null) {
@@ -190,3 +206,4 @@ class BookingProvider with ChangeNotifier {
     return null;
   }
 }
+
