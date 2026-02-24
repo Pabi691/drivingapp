@@ -16,6 +16,7 @@ class AddPupilScreen extends StatefulWidget {
 }
 
 class _AddPupilScreenState extends State<AddPupilScreen> {
+  final _formKey = GlobalKey<FormState>();
   final nameCtrl = TextEditingController();
   final phoneCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
@@ -73,20 +74,22 @@ class _AddPupilScreenState extends State<AddPupilScreen> {
   }
 
   Future<void> _savePupil() async {
+    if (!_formKey.currentState!.validate()) return;
+
     if (instructorId == null || areaId == null) {
        ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select instructor and area')),
+        const SnackBar(content: Text('Please select an instructor and area', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
       );
       return;
     }
 
     final data = {
-      "full_name": nameCtrl.text,
-      "phone": phoneCtrl.text,
-      "email": emailCtrl.text,
+      "full_name": nameCtrl.text.trim(),
+      "phone": phoneCtrl.text.trim(),
+      "email": emailCtrl.text.trim(),
       "instructor_id": instructorId,
       "area_id": areaId,
-      "package_id": packageId,
+      if (packageId != null) "package_id": packageId,
     };
 
     try {
@@ -97,10 +100,7 @@ class _AddPupilScreenState extends State<AddPupilScreen> {
         // Create
         await PupilService.createPupil(data);
         if (mounted) {
-           // For create, we might want to refresh the provider too if not handled elsewhere
-           // But screen usually pops returning 'true'
-           context.read<PupilProvider>().addPupilLocally({...data, 'status': 'active'}); // optimistic or just refresh
-           context.read<PupilProvider>().fetchPupils(); // simpler to just fetch
+           await context.read<PupilProvider>().fetchPupils();
         }
       }
 
@@ -109,8 +109,9 @@ class _AddPupilScreenState extends State<AddPupilScreen> {
       
     } catch (e) {
       if (mounted) {
+        final errorMsg = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $errorMsg', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
         );
       }
     }
@@ -126,59 +127,80 @@ class _AddPupilScreenState extends State<AddPupilScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.pupil != null ? 'Edit Pupil' : 'Add Pupil')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name')),
-          TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone')),
-          TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(
+              controller: nameCtrl, 
+              decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder(), errorBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.red))),
+              validator: (v) => v == null || v.trim().isEmpty ? 'Please enter Full Name' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: phoneCtrl, 
+              decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder(), errorBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.red))),
+              validator: (v) => v == null || v.trim().isEmpty ? 'Please enter Phone' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: emailCtrl, 
+              decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder(), errorBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.red))),
+              validator: (v) => v == null || v.trim().isEmpty ? 'Please enter Email' : null,
+            ),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          DropdownButtonFormField(
-            value: instructorId, // changed from initialValue to value for reactive updates
-            decoration: const InputDecoration(labelText: 'Instructor'),
-            items: instructors.map<DropdownMenuItem<String>>((i) {
-              return DropdownMenuItem(
-                value: i.id,
-                child: Text(i.email),
-              );
-            }).toList(),
-            onChanged: (v) => setState(() => instructorId = v),
-          ),
+            DropdownButtonFormField(
+              value: instructorId, // changed from initialValue to value for reactive updates
+              decoration: const InputDecoration(labelText: 'Instructor', border: OutlineInputBorder()),
+              validator: (v) => v == null ? 'Please select an Instructor' : null,
+              items: instructors.map<DropdownMenuItem<String>>((i) {
+                return DropdownMenuItem(
+                  value: i.id,
+                  child: Text(i.email),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => instructorId = v),
+            ),
+            const SizedBox(height: 16),
 
-          DropdownButtonFormField(
-            value: areaId,
-            decoration: const InputDecoration(labelText: 'Area'),
-            items: areas.map<DropdownMenuItem<String>>((a) {
-              return DropdownMenuItem(
-                value: a['_id'],
-                child: Text(a['name']),
-              );
-            }).toList(),
-            onChanged: (v) => setState(() => areaId = v),
-          ),
+            DropdownButtonFormField(
+              value: areaId,
+              decoration: const InputDecoration(labelText: 'Area', border: OutlineInputBorder()),
+              validator: (v) => v == null ? 'Please select an Area' : null,
+              items: areas.map<DropdownMenuItem<String>>((a) {
+                return DropdownMenuItem(
+                  value: a['_id'],
+                  child: Text(a['name']),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => areaId = v),
+            ),
+            const SizedBox(height: 16),
 
-          DropdownButtonFormField(
-            value: packageId,
-            decoration: const InputDecoration(labelText: 'Package'),
-            items: packages.map<DropdownMenuItem<String>>((p) {
-              return DropdownMenuItem(
-                value: p['_id'],
-                child: Text('${p['package_name']} (${p['duration']} hrs)'),
-              );
-            }).toList(),
-            onChanged: (v) => setState(() => packageId = v),
-          ),
+            DropdownButtonFormField(
+              value: packageId,
+              decoration: const InputDecoration(labelText: 'Package (Optional)', border: OutlineInputBorder()),
+              items: packages.map<DropdownMenuItem<String>>((p) {
+                return DropdownMenuItem(
+                  value: p['_id'],
+                  child: Text('${p['package_name']} (${p['duration']} hrs)'),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => packageId = v),
+            ),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          ElevatedButton.icon(
-            onPressed: _savePupil,
-            icon: const Icon(Icons.save),
-            label: Text(widget.pupil != null ? 'Update Pupil' : 'Create Pupil'),
-          ),
-        ],
+            ElevatedButton.icon(
+              onPressed: _savePupil,
+              icon: const Icon(Icons.save),
+              label: Text(widget.pupil != null ? 'Update Pupil' : 'Create Pupil'),
+            ),
+          ],
+        ),
       ),
     );
   }

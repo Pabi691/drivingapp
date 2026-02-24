@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../auth/auth_provider.dart';
 import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -115,97 +116,163 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final instructorId = context.read<AuthProvider>().instructorId;
     if (instructorId == null) return;
 
-    final nameCtrl = TextEditingController(text: _text(profile['name']));
-    final emailCtrl = TextEditingController(text: _text(profile['email']));
-    final mobileCtrl = TextEditingController(text: _text(profile['mobile']));
-    final addressCtrl =
-        TextEditingController(text: _text(profile['full_address']));
-    final bioCtrl =
-        TextEditingController(text: _text(profile['instructor_bio']));
-    final transmissionCtrl =
-        TextEditingController(text: _text(profile['transmission_type']));
-    final licenceNoCtrl = TextEditingController(
-      text: _text(profile['driving_lichence_number']),
-    );
-    final licenceExpiryCtrl = TextEditingController(
-      text: _dateText(profile['licence_expiry_date']),
-    );
-    final badgeNoCtrl =
-        TextEditingController(text: _text(profile['pdi_badge_number']));
-    final badgeExpiryCtrl = TextEditingController(
-      text: _dateText(profile['badge_expiry_date']),
-    );
-    final experienceCtrl =
-        TextEditingController(text: _text(profile['experience']));
+    final formKey = GlobalKey<FormState>();
+
+    String getVal(String key) {
+      final val = _text(profile[key]);
+      return val == '-' ? '' : val;
+    }
+
+    String getDateVal(String key) {
+      final val = _dateText(profile[key]);
+      return val == '-' ? '' : val;
+    }
+
+    final nameCtrl = TextEditingController(text: getVal('name'));
+    final emailCtrl = TextEditingController(text: getVal('email'));
+    final mobileCtrl = TextEditingController(text: getVal('mobile'));
+    final addressCtrl = TextEditingController(text: getVal('full_address'));
+    final bioCtrl = TextEditingController(text: getVal('instructor_bio'));
+    
+    final licenceNoCtrl = TextEditingController(text: getVal('driving_lichence_number'));
+    final licenceExpiryCtrl = TextEditingController(text: getDateVal('licence_expiry_date'));
+    final badgeNoCtrl = TextEditingController(text: getVal('pdi_badge_number'));
+    final badgeExpiryCtrl = TextEditingController(text: getDateVal('badge_expiry_date'));
+    final experienceCtrl = TextEditingController(text: getVal('experience'));
+
+    String transmissionType = getVal('transmission_type');
+    if (transmissionType.isEmpty || !['Manual', 'Automatic', 'Both'].contains(transmissionType)) {
+      transmissionType = 'Manual';
+    }
+
+    XFile? selectedProfileImage;
 
     await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Update Profile'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _formField('Name', nameCtrl),
-              _formField('Email', emailCtrl),
-              _formField('Mobile', mobileCtrl),
-              _formField('Address', addressCtrl),
-              _formField('Bio', bioCtrl),
-              _formField('Transmission Type', transmissionCtrl),
-              _formField('Driving Licence Number', licenceNoCtrl),
-              _formField('Licence Expiry (YYYY-MM-DD)', licenceExpiryCtrl),
-              _formField('PDI Badge Number', badgeNoCtrl),
-              _formField('Badge Expiry (YYYY-MM-DD)', badgeExpiryCtrl),
-              _formField('Experience', experienceCtrl),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Update Profile'),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final picker = ImagePicker();
+                        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                        if (image != null) {
+                          setDialogState(() => selectedProfileImage = image);
+                        }
+                      },
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.grey.shade300,
+                        child: selectedProfileImage == null
+                            ? const Icon(Icons.add_a_photo, size: 30, color: Colors.black54)
+                            : const Icon(Icons.check, size: 30, color: Colors.green),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (selectedProfileImage != null)
+                      Text('Selected: ${selectedProfileImage!.name}', style: const TextStyle(fontSize: 12)),
+                    const SizedBox(height: 12),
+                    _formField('Name', nameCtrl, isRequired: true),
+                    _formField('Email', emailCtrl, isRequired: true),
+                    _formField('Mobile', mobileCtrl, isRequired: true),
+                    _formField('Address', addressCtrl, isRequired: true),
+                    _formField('Bio', bioCtrl, isRequired: true),
+                    
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: DropdownButtonFormField<String>(
+                        value: transmissionType,
+                        decoration: const InputDecoration(
+                          labelText: 'Transmission Type',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (val) => val == null || val.isEmpty ? 'Please select Transmission Type' : null,
+                        items: ['Manual', 'Automatic', 'Both'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => transmissionType = val);
+                        },
+                      ),
+                    ),
+
+                    _formField('Driving Licence Number', licenceNoCtrl, isRequired: true),
+                    _formField('Licence Expiry (YYYY-MM-DD)', licenceExpiryCtrl, isRequired: true),
+                    _formField('PDI Badge Number', badgeNoCtrl, isRequired: true),
+                    _formField('Badge Expiry (YYYY-MM-DD)', badgeExpiryCtrl, isRequired: true),
+                    _formField('Experience', experienceCtrl, isRequired: true),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+
+                  final payload = <String, String>{
+                    'name': nameCtrl.text.trim(),
+                    'email': emailCtrl.text.trim(),
+                    'mobile': mobileCtrl.text.trim(),
+                    'full_address': addressCtrl.text.trim(),
+                    'instructor_bio': bioCtrl.text.trim(),
+                    'transmission_type': transmissionType,
+                    'driving_lichence_number': licenceNoCtrl.text.trim(),
+                    'licence_expiry_date': licenceExpiryCtrl.text.trim(),
+                    'pdi_badge_number': badgeNoCtrl.text.trim(),
+                    'badge_expiry_date': badgeExpiryCtrl.text.trim(),
+                    'experience': experienceCtrl.text.trim(),
+                  };
+
+                  Navigator.pop(context);
+                  setState(() => _savingProfile = true);
+
+                  try {
+                    List<int>? profileBytes;
+                    String? profileFilename;
+                    if (selectedProfileImage != null) {
+                      profileBytes = await selectedProfileImage!.readAsBytes();
+                      profileFilename = selectedProfileImage!.name;
+                    }
+
+                    await ProfileService.updateProfileMultipart(
+                      instructorId, 
+                      payload,
+                      profileBytes: profileBytes,
+                      profileFilename: profileFilename,
+                    );
+                    await _loadData(instructorId);
+
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Profile updated')),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    final errorMsg = e.toString().replaceAll('Exception: ', '');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Update failed: $errorMsg'), backgroundColor: Colors.red),
+                    );
+                  } finally {
+                    if (mounted) {
+                      setState(() => _savingProfile = false);
+                    }
+                  }
+                },
+                child: const Text('Save'),
+              ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final payload = <String, dynamic>{
-                'name': nameCtrl.text.trim(),
-                'email': emailCtrl.text.trim(),
-                'mobile': mobileCtrl.text.trim(),
-                'full_address': addressCtrl.text.trim(),
-                'instructor_bio': bioCtrl.text.trim(),
-                'transmission_type': transmissionCtrl.text.trim(),
-                'driving_lichence_number': licenceNoCtrl.text.trim(),
-                'licence_expiry_date': licenceExpiryCtrl.text.trim(),
-                'pdi_badge_number': badgeNoCtrl.text.trim(),
-                'badge_expiry_date': badgeExpiryCtrl.text.trim(),
-                'experience': experienceCtrl.text.trim(),
-              };
-
-              Navigator.pop(context);
-              setState(() => _savingProfile = true);
-
-              try {
-                await ProfileService.updateProfile(instructorId, payload);
-                await _loadData(instructorId);
-
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Profile updated')),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Update failed: $e')),
-                );
-              } finally {
-                if (mounted) {
-                  setState(() => _savingProfile = false);
-                }
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+          );
+        }
       ),
     );
   }
@@ -511,14 +578,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return split.isNotEmpty ? split.first : raw;
   }
 
-  Widget _formField(String label, TextEditingController controller) {
+  Widget _formField(String label, TextEditingController controller, {bool isRequired = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
+        validator: (value) {
+          if (isRequired && (value == null || value.trim().isEmpty)) {
+            return 'Please enter $label';
+          }
+          return null;
+        },
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
+          errorBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.red, width: 1.5),
+          ),
+          focusedErrorBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.red, width: 1.5),
+          ),
         ),
       ),
     );

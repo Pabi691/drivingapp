@@ -13,10 +13,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscureText = true;
   bool _isLoading = false;
+  String? _emailError;
+  String? _passwordError;
 
   @override
   void dispose() {
@@ -39,7 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
+        child: Form(
+          key: _formKey,
+          child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -52,17 +57,26 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            _buildTextField(_usernameController, 'Username'),
+            _buildTextField(
+              _usernameController, 
+              'Email',
+              errorText: _emailError,
+            ),
             const SizedBox(height: 16),
             _buildTextField(
               _passwordController,
               'Password',
               obscureText: _obscureText,
               suffixIcon: _buildPasswordIcon(),
+              errorText: _passwordError,
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: _isLoading ? null : _login,
+              onPressed: _isLoading ? null : () {
+                if (_formKey.currentState!.validate()) {
+                  _login();
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.blue,
@@ -86,11 +100,16 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
   Future<void> _login() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _emailError = null;
+      _passwordError = null;
+    });
 
     try {
       await context.read<AuthProvider>().login(
@@ -103,9 +122,18 @@ class _LoginScreenState extends State<LoginScreen> {
       context.go('/get-started');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      final errorStr = e.toString().toLowerCase();
+      setState(() {
+        if (errorStr.contains('not found') || errorStr.contains('registered')) {
+          _emailError = 'Instructor not found';
+        } else if (errorStr.contains('password')) {
+          _passwordError = 'Wrong password';
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          );
+        }
+      });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -116,19 +144,36 @@ class _LoginScreenState extends State<LoginScreen> {
     String label, {
     bool obscureText = false,
     Widget? suffixIcon,
+    String? errorText,
   }) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       obscureText: obscureText,
       style: const TextStyle(color: Colors.white),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Please enter your $label';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         labelText: label,
+        errorText: errorText,
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.1),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
+        ),
+        errorStyle: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
         ),
         suffixIcon: suffixIcon,
       ),

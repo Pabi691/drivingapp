@@ -75,18 +75,13 @@ class PupilProvider with ChangeNotifier {
 
     try {
       await PupilService.updatePupil(id, data);
-      final index = _pupils.indexWhere((p) => p['_id'] == id);
-      if (index != -1) {
-        // Merge allowed fields or just refetch. For now, we manually update key fields.
-        _pupils[index] = {..._pupils[index], ...data};
-      }
-      _error = null;
+      await fetchPupils();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error updating pupil: $e');
-    } finally {
       _isLoading = false;
       notifyListeners();
+      rethrow; // Rethrow to let the UI catch and show the error Snackbar
     }
   }
 }

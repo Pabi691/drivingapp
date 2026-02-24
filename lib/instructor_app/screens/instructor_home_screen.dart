@@ -7,6 +7,9 @@ import '../auth/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../models/event.dart';
 import 'total_drive_screen.dart';
+import 'profile_screen.dart';
+import 'pupils_screen.dart';
+import '../auth/login_screen.dart';
 
 class InstructorHomeScreen extends StatefulWidget {
   const InstructorHomeScreen({super.key});
@@ -52,10 +55,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
       title: Text(
         DateFormat.yMMMM().format(_focusedDay),
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-      leading: IconButton(
-        icon: const Icon(Icons.menu, color: Colors.white),
-        onPressed: () {},
       ),
       actions: [
         TextButton(
@@ -158,43 +157,108 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
     );
   }
 
-  Future<void> _showBookingStatusSheet(Event event) async {
-    final String? selectedStatus = await showModalBottomSheet<String>(
+  Future<void> _showBookingDetailsDialog(Event event) async {
+    final Map<String, dynamic> rawData = event.rawData ?? {};
+    
+    // Extract additional details
+    final pupilObj = rawData['pupil_id'] is Map ? rawData['pupil_id'] : null;
+    final pupilPhone = pupilObj?['phone'] ?? 'Unknown';
+    final pupilEmail = pupilObj?['email'] ?? 'Unknown';
+    final gearbox = rawData['gearbox'] ?? 'Unknown';
+    final pickup = rawData['pickup'] ?? 'Unknown';
+    final dropoff = rawData['dropoff'] ?? 'Unknown';
+    final privateNotes = rawData['private_notes'] ?? 'None';
+    final durationMins = event.duration.inMinutes;
+
+    await showDialog(
       context: context,
       builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(event.title),
-                subtitle: Text('Current status: ${_formatStatus(event.status)}'),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                title: const Text('Completed'),
-                onTap: () => Navigator.pop(context, 'completed'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.cancel_outlined, color: Colors.red),
-                title: const Text('Cancelled'),
-                onTap: () => Navigator.pop(context, 'cancelled'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.pending_outlined, color: Colors.orange),
-                title: const Text('Pending'),
-                onTap: () => Navigator.pop(context, 'pending'),
-              ),
-            ],
+        return AlertDialog(
+          title: Text(event.title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow(Icons.access_time, 'Start Time', DateFormat.jm().format(event.startTime)),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.timer, 'Duration', '$durationMins mins'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.phone, 'Phone', '$pupilPhone'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.email, 'Email', '$pupilEmail'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.directions_car, 'Gearbox', '$gearbox'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.location_on, 'Pickup', '$pickup'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.location_on_outlined, 'Dropoff', '$dropoff'),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.note, 'Notes', '$privateNotes'),
+                const SizedBox(height: 16),
+                const Text('Change Status:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text('Pending'),
+                      backgroundColor: Colors.orange.withValues(alpha: 0.2),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _updateStatus(event, 'pending');
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text('Completed'),
+                      backgroundColor: Colors.green.withValues(alpha: 0.2),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _updateStatus(event, 'completed');
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text('Cancelled'),
+                      backgroundColor: Colors.red.withValues(alpha: 0.2),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _updateStatus(event, 'cancelled');
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );
+  }
 
-    if (selectedStatus == null || selectedStatus == event.status) {
-      return;
-    }
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[700]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '$label: $value',
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _updateStatus(Event event, String selectedStatus) async {
+    if (selectedStatus == event.status) return;
     if (!mounted) return;
 
     final instructorId = context.read<AuthProvider>().instructorId;
@@ -229,6 +293,67 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue, Colors.lightBlueAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.directions_car, size: 60, color: Colors.white),
+                  SizedBox(height: 10),
+                  Text('Driving App', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Home / Diary'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text('Pupils'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilsScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('My Profile'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                Navigator.pop(context); // Close drawer
+                await context.read<AuthProvider>().logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
       body: Consumer<BookingProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
@@ -260,10 +385,6 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
             ],
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddOptions(context),
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -410,7 +531,7 @@ class _InstructorHomeScreenState extends State<InstructorHomeScreen> {
                             ? event.duration.inMinutes.toDouble()
                             : 30.0,
                         child: GestureDetector(
-                          onTap: () => _showBookingStatusSheet(event),
+                          onTap: () => _showBookingDetailsDialog(event),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             color: event.color,

@@ -7,6 +7,7 @@ class Event {
   final Duration duration;
   final Color color;
   final String status;
+  final Map<String, dynamic>? rawData;
 
   const Event({
     required this.id,
@@ -15,6 +16,7 @@ class Event {
     required this.duration,
     required this.color,
     required this.status,
+    this.rawData,
   });
 }
 

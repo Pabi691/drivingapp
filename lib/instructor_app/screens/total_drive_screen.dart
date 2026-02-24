@@ -51,7 +51,7 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
   bool _showLessonAdvanced = false;
   bool _showGapAdvanced = false;
   bool _showAwayAdvanced = false;
-  String _repeat = 'no repeat';
+  String _repeat = 'norepeat';
   String _gearbox = 'manual';
   final TextEditingController _pickupController = TextEditingController();
   final TextEditingController _dropoffController = TextEditingController();
@@ -70,8 +70,12 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
 
   void _saveEvent() async {
     if (_tabController.index != 0) {
-      // TODO: Handle Gap/Away saving if API supports it
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only Lessons supported via API for now')));
+      return;
+    }
+
+    if (_selectedPupilId == null || _selectedPupilId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a pupil', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
       return;
     }
 
@@ -120,7 +124,11 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
 
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        final errorMsg = e.toString().replaceAll('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(errorMsg, style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.red,
+        ));
       }
     } finally {
        if (mounted) setState(() => _isLoading = false);
@@ -200,7 +208,8 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
           _buildDropdownField(
             label: 'Repeat',
             value: _repeat,
-            items: const ['no repeat', 'repeat'],
+            items: const ['norepeat', 'repeat'],
+            displayItems: const ['No Repeat', 'Repeat'],
             onChanged: (val) {
               if (val != null) setState(() => _repeat = val);
             },
@@ -308,6 +317,7 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
     required String label,
     required String value,
     required List<String> items,
+    List<String>? displayItems,
     ValueChanged<String?>? onChanged,
   }) {
     return Row(
@@ -316,10 +326,13 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
         const Spacer(),
         DropdownButton<String>(
           value: value,
-          items: items.map((String value) {
+          items: items.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final String val = entry.value;
+            final String displayVal = displayItems != null ? displayItems[index] : val;
             return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
+              value: val,
+              child: Text(displayVal),
             );
           }).toList(),
           onChanged: onChanged,
@@ -387,7 +400,8 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
         _buildDropdownField(
           label: 'Repeat',
           value: _repeat,
-          items: const ['no repeat', 'repeat'],
+          items: const ['norepeat', 'repeat'],
+          displayItems: const ['No Repeat', 'Repeat'],
           onChanged: (val) {
             if (val != null) setState(() => _repeat = val);
           },
@@ -408,7 +422,8 @@ class _TotalDriveScreenState extends State<TotalDriveScreen> with SingleTickerPr
         _buildDropdownField(
           label: 'Repeat',
           value: _repeat,
-          items: const ['no repeat', 'repeat'],
+          items: const ['norepeat', 'repeat'],
+          displayItems: const ['No Repeat', 'Repeat'],
           onChanged: (val) {
             if (val != null) setState(() => _repeat = val);
           },

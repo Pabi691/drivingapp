@@ -31,6 +31,20 @@ class ProfileService {
     ApiClient.decodeResponse(res);
   }
 
+  static Future<void> updateProfileMultipart(
+    String id,
+    Map<String, String> body, {
+      List<int>? profileBytes, String? profileFilename,
+      List<int>? licenceBytes, String? licenceFilename,
+  }) async {
+    final res = await ApiClient.updateInstructorMultipart(
+      id, body,
+      profileBytes: profileBytes, profileFilename: profileFilename,
+      licenceBytes: licenceBytes, licenceFilename: licenceFilename,
+    );
+    ApiClient.decodeResponse(res);
+  }
+
   // static Future<void> createWorkingHour(Map<String, dynamic> body) async {
   //   await ApiClient.post('/ds/instructor-working-hours', body);
   // }

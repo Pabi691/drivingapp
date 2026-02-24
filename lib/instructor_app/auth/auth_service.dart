@@ -56,7 +56,16 @@ class AuthService {
         await TokenStorage.saveUser(jsonEncode(data['user']));
       }
     } else {
-      throw Exception(data['message'] ?? 'Login failed');
+      String errorMessage = data['message'] ?? 'Login failed';
+      // Mappings based on requested validation
+      if (errorMessage.toLowerCase().contains("user not found") || 
+          errorMessage.toLowerCase().contains("not registered")) {
+        errorMessage = "Instructor not found";
+      } else if (errorMessage.toLowerCase().contains("password")) {
+        errorMessage = "Wrong password";
+      }
+      
+      throw errorMessage;
     }
   }
 

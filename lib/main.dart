@@ -17,33 +17,63 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final AuthProvider _authProvider;
+  late final GoRouter _router;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authProvider = AuthProvider();
+    _router = _buildRouter(_authProvider);
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _authProvider.checkAuth();
+    setState(() {
+      _isInitialized = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider.value(value: _authProvider),
         ChangeNotifierProvider(create: (_) => PupilProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => MoneyProvider()),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          return MaterialApp.router(
-            title: 'Driving School App',
-            theme: ThemeData(
-              primarySwatch: Colors.blue,
-            ),
-            routerConfig: _router(authProvider),
-          );
-        },
+      child: MaterialApp.router(
+        title: 'Driving School App',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        routerConfig: _router,
       ),
     );
   }
 
-  GoRouter _router(AuthProvider authProvider) {
+  GoRouter _buildRouter(AuthProvider authProvider) {
     return GoRouter(
       refreshListenable: authProvider,
       initialLocation: '/',

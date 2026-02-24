@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../utils/token_storage.dart';
 
 class ApiClient {
@@ -34,6 +35,22 @@ class ApiClient {
       // If API returns a raw list, wrap it in a map
       return {'data': decoded};
     } else if (decoded is Map<String, dynamic>) {
+      final isSuccess = decoded['success'];
+      final isStatus = decoded['status'];
+
+      if (isSuccess == false || isStatus == false) {
+        String errorMessage = decoded['message']?.toString() ?? 'API Request Failed';
+        
+        if (decoded['errors'] is List) {
+          final errorList = decoded['errors'] as List;
+          if (errorList.isNotEmpty) {
+            errorMessage += '\n' + errorList.join('\n');
+          }
+        }
+        
+        throw Exception(errorMessage);
+      }
+
       return decoded;
     } else {
       throw Exception('Unexpected response format: ${decoded.runtimeType}');
@@ -56,15 +73,27 @@ class ApiClient {
   static Future<http.Response> post(
       String endpoint, Map<String, dynamic> body) async {
     final token = await TokenStorage.getToken();
+    final url = '$baseUrl$endpoint';
+    
+    debugPrint('--- API POST REQUEST ---');
+    debugPrint('URL: $url');
+    debugPrint('Token: ${token != null ? 'Present' : 'Missing'}');
+    debugPrint('Body: ${jsonEncode(body)}');
 
-    return http.post(
-      Uri.parse('$baseUrl$endpoint'),
+    final response = await http.post(
+      Uri.parse(url),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
       body: jsonEncode(body),
     );
+    
+    debugPrint('--- API POST RESPONSE ---');
+    debugPrint('Status: ${response.statusCode}');
+    debugPrint('Response Body: ${response.body}');
+    
+    return response;
   }
 
   static Future<http.Response> patch(
@@ -249,6 +278,42 @@ class ApiClient {
   static Future<http.Response> updateInstructor(
       String id, Map<String, dynamic> body) async {
     return post('/ds/instructor-masters/$id', body);
+  }
+
+  static Future<http.Response> updateInstructorMultipart(
+      String id, Map<String, String> fields, {
+        List<int>? profileBytes, String? profileFilename,
+        List<int>? licenceBytes, String? licenceFilename,
+      }) async {
+    final token = await TokenStorage.getToken();
+    final url = '$baseUrl/ds/instructor-masters/$id';
+
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers.addAll({
+      if (token != null) 'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    });
+
+    request.fields.addAll(fields);
+
+    if (profileBytes != null && profileBytes.isNotEmpty) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'profile',
+        profileBytes,
+        filename: profileFilename ?? 'profile.jpg',
+      ));
+    }
+
+    if (licenceBytes != null && licenceBytes.isNotEmpty) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'upload_licence_copy',
+        licenceBytes,
+        filename: licenceFilename ?? 'licence.jpg',
+      ));
+    }
+
+    final streamResponse = await request.send();
+    return http.Response.fromStream(streamResponse);
   }
 
   static Future<http.Response> deleteInstructor(String id) async {

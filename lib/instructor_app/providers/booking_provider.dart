@@ -81,6 +81,7 @@ class BookingProvider with ChangeNotifier {
           duration: Duration(minutes: durationMinutes),
           color: _colorForStatus(status),
           status: status,
+          rawData: b as Map<String, dynamic>?,
         );
 
         if (_bookings[normalizedDate] == null) {
@@ -112,6 +113,7 @@ class BookingProvider with ChangeNotifier {
       final isSuccess = data['success'];
       if (isSuccess == false) {
         final message = data['message']?.toString() ?? 'Booking creation failed';
+        debugPrint('Booking API returned success: false, message: $message');
         throw Exception(message);
       }
 
@@ -120,6 +122,7 @@ class BookingProvider with ChangeNotifier {
         await fetchBookings(instructorId);
       }
     } catch (e) {
+      debugPrint('Error Creating Booking: $e');
       _error = e.toString();
       rethrow;
     } finally {
