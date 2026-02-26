@@ -47,51 +47,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
 
+  /// Parses a time string like "08:00" or "8:00" into a TimeOfDay.
+  TimeOfDay _parseTime(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) {
+      return const TimeOfDay(hour: 9, minute: 0);
+    }
+    final parts = timeStr.trim().split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]) ?? 9;
+      final minute = int.tryParse(parts[1]) ?? 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    }
+    return const TimeOfDay(hour: 9, minute: 0);
+  }
+
+  /// Formats a TimeOfDay into "HH:mm" string.
+  String _formatTime(TimeOfDay time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
   Future<void> _editWorkingHour(int index) async {
     final day = workingDays[index];
 
-    final startCtrl = TextEditingController(text: day['start_time']);
-    final endCtrl = TextEditingController(text: day['end_time']);
-    final breakStartCtrl =
-        TextEditingController(text: day['break_start']);
-    final breakEndCtrl =
-        TextEditingController(text: day['break_end']);
+    TimeOfDay startTime = _parseTime(day['start_time']);
+    TimeOfDay endTime = _parseTime(day['end_time']);
+    TimeOfDay breakStart = _parseTime(day['break_start']);
+    TimeOfDay breakEnd = _parseTime(day['break_end']);
 
     await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(dayName(day['day_of_week'])),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _timeField('Start', startCtrl),
-            _timeField('End', endCtrl),
-            _timeField('Break Start', breakStartCtrl),
-            _timeField('Break End', breakEndCtrl),
-          ],
-        ),
-        actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            setState(() {
-              workingDays[index] = {
-                ...day,
-                "start_time": startCtrl.text,
-                "end_time": endCtrl.text,
-                "break_start": breakStartCtrl.text,
-                "break_end": breakEndCtrl.text,
-              };
-            });
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> pickTime(String label, TimeOfDay initial, ValueChanged<TimeOfDay> onPicked) async {
+            final picked = await showTimePicker(
+              context: dialogContext,
+              initialTime: initial,
+              helpText: 'Select $label',
+              builder: (context, child) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setDialogState(() => onPicked(picked));
+            }
+          }
 
-            Navigator.pop(context);
-          },
-          child: const Text('Save'),
-        ),
-      ],
+          return AlertDialog(
+            title: Text(dayName(day['day_of_week'])),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _timePickerTile('Start Time', startTime, (t) => pickTime('Start Time', startTime, (v) => startTime = v)),
+                _timePickerTile('End Time', endTime, (t) => pickTime('End Time', endTime, (v) => endTime = v)),
+                const Divider(),
+                _timePickerTile('Break Start', breakStart, (t) => pickTime('Break Start', breakStart, (v) => breakStart = v)),
+                _timePickerTile('Break End', breakEnd, (t) => pickTime('Break End', breakEnd, (v) => breakEnd = v)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    workingDays[index] = {
+                      ...day,
+                      "start_time": _formatTime(startTime),
+                      "end_time": _formatTime(endTime),
+                      "break_start": _formatTime(breakStart),
+                      "break_end": _formatTime(breakEnd),
+                    };
+                  });
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -100,10 +140,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final p = await ProfileService.getProfile(instructorId);
     final days = await ProfileService.getWorkingDays(instructorId);
 
-    // 🔥 First-time instructor → backend already auto-creates 7 days
-    // If not, backend should handle this (BEST PRACTICE)
-
     if (!mounted) return;
+
+    // Fill in any missing days (1–7) so all 7 are always visible
+    final existingDayNumbers = days.map((d) => d['day_of_week']).toSet();
+    for (int i = 1; i <= 7; i++) {
+      if (!existingDayNumbers.contains(i)) {
+        days.add({
+          'day_of_week': i,
+          'is_working': 0,
+          'start_time': null,
+          'end_time': null,
+          'break_start': null,
+          'break_end': null,
+        });
+      }
+    }
+    // Sort by day_of_week so Mon=1 … Sun=7
+    days.sort((a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int));
 
     setState(() {
       profile = p['data'];
@@ -180,8 +234,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text('Selected: ${selectedProfileImage!.name}', style: const TextStyle(fontSize: 12)),
                     const SizedBox(height: 12),
                     _formField('Name', nameCtrl, isRequired: true),
-                    _formField('Email', emailCtrl, isRequired: true),
-                    _formField('Mobile', mobileCtrl, isRequired: true),
+                    _formField('Email', emailCtrl, isRequired: true,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter Email';
+                        }
+                        final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+                        if (!emailRegex.hasMatch(value.trim())) {
+                          return 'Please enter a valid email address';
+                        }
+                        return null;
+                      },
+                    ),
+                    _formField('Mobile', mobileCtrl, isRequired: true,
+                      keyboardType: TextInputType.phone,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter Mobile';
+                        }
+                        final cleaned = value.trim().replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+                        if (!RegExp(r'^\d{7,15}$').hasMatch(cleaned)) {
+                          return 'Please enter a valid mobile number (7-15 digits)';
+                        }
+                        return null;
+                      },
+                    ),
                     _formField('Address', addressCtrl, isRequired: true),
                     _formField('Bio', bioCtrl, isRequired: true),
                     
@@ -279,6 +357,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveWorkingSchedule() async {
     final instructorId = context.read<AuthProvider>().instructorId;
+    debugPrint('🟡 [SaveSchedule] instructorId = $instructorId');
+
+    if (instructorId == null) {
+      debugPrint('🔴 [SaveSchedule] instructorId is null — aborting');
+      return;
+    }
 
     final Map<String, dynamic> payload = {
       "instructor_id": instructorId,
@@ -287,10 +371,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     for (final day in workingDays) {
       final isEnabled = day['is_working'] == 1;
+      debugPrint('🟡 [SaveSchedule] day=${day['day_of_week']}, isWorking=$isEnabled, start=${day['start_time']}, end=${day['end_time']}, breakStart=${day['break_start']}, breakEnd=${day['break_end']}');
 
       payload["workingDays"][day['day_of_week'].toString()] = {
-        "enabled": isEnabled,
-
+        "is_working": isEnabled,
         if (isEnabled) ...{
           "workStart": day['start_time'],
           "workEnd": day['end_time'],
@@ -300,13 +384,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       };
     }
 
-    await ProfileService.upsertWorkingDays(payload);
+    debugPrint('🟢 [SaveSchedule] Final payload: $payload');
 
-    if (!mounted) return;
+    try {
+      await ProfileService.upsertWorkingDays(payload);
+      debugPrint('✅ [SaveSchedule] upsertWorkingDays completed successfully');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Schedule saved')),
-    );
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Schedule saved')),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('🔴 [SaveSchedule] ERROR: $e');
+      debugPrint('🔴 [SaveSchedule] StackTrace: $stackTrace');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Schedule save failed: ${e.toString().replaceAll("Exception: ", "")}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _openDocument(String url) async {
@@ -578,12 +679,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return split.isNotEmpty ? split.first : raw;
   }
 
-  Widget _formField(String label, TextEditingController controller, {bool isRequired = false}) {
+  Widget _formField(String label, TextEditingController controller, {
+    bool isRequired = false,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextFormField(
         controller: controller,
-        validator: (value) {
+        keyboardType: keyboardType,
+        validator: validator ?? (value) {
           if (isRequired && (value == null || value.trim().isEmpty)) {
             return 'Please enter $label';
           }
@@ -603,14 +709,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _timeField(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
+  Widget _timePickerTile(String label, TimeOfDay time, ValueChanged<TimeOfDay> onTap) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+      trailing: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => onTap(time),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.access_time, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                _formatTime(time),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

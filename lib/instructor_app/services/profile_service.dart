@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
 class ProfileService {
@@ -19,7 +20,10 @@ class ProfileService {
   // }
 
   static Future<void> upsertWorkingDays(Map<String, dynamic> body) async {
+    debugPrint('🟡 [ProfileService.upsertWorkingDays] Sending body: $body');
     final res = await ApiClient.upsertInstructorWorkingDays(body);
+    debugPrint('🟢 [ProfileService.upsertWorkingDays] Response status: ${res.statusCode}');
+    debugPrint('🟢 [ProfileService.upsertWorkingDays] Response body: ${res.body}');
     ApiClient.decodeResponse(res);
   }
 
